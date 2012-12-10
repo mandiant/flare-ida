@@ -371,17 +371,44 @@ for c in input_string {
 }
 '''
 
+def playWith0xedb88320Hash(inString):
+    esi = 0xFFFFFFFF
+    for d in inString:
+        c = ord(d)
+        for i in range(8):
+            eax = c
+            eax ^= esi
+            b0  = eax & 0xFF
+            b0 &= 0x01
+            b0  = -b0
+            if b0 % 2 == 0: # sbb eax, eax
+                eax = 0
+            else:
+                eax = 0xFFFFFFFF
+            eax &= 0xedb88320
+            esi >>= 1
+            esi ^= eax
+            c >>= 1
+    return esi ^ 0xFFFFFFFF
+
+pseudocode_playWith0xedb88320Hash = \
+'''Too hard to explain, AND's with 0xedb88320, though.
+String hash function from Gatak sample.
+See code for information'''
+
+
 # The list of tuples of (supported hash name, hash size, pseudo_code)
 HASH_TYPES = [
-    ('ror13AddHash32',      32, pseudocode_ror13AddHash32),
-    ('poisonIvyHash',       32, pseudocode_poisonIvyHash),
-    ('rol7AddHash32',       32, pseudocode_rol7AddHash32),
-    ('ror7AddHash32',       32, pseudocode_ror7AddHash32),
-    ('ror9AddHash32',       32, pseudocode_ror9AddHash32),
-    ('ror11AddHash32',      32, pseudocode_ror11AddHash32),
-    ('ror13AddHash32Sub1',  32, pseudocode_ror13AddHash32),
-    ('shl7shr19Hash32',     32, pseudocode_shl7shr19Hash32),
-    ('sll1AddHash32',       32, pseudocode_sll1AddHash32),
+    ('ror13AddHash32',         32, pseudocode_ror13AddHash32),
+    ('poisonIvyHash',          32, pseudocode_poisonIvyHash),
+    ('rol7AddHash32',          32, pseudocode_rol7AddHash32),
+    ('ror7AddHash32',          32, pseudocode_ror7AddHash32),
+    ('ror9AddHash32',          32, pseudocode_ror9AddHash32),
+    ('ror11AddHash32',         32, pseudocode_ror11AddHash32),
+    ('ror13AddHash32Sub1',     32, pseudocode_ror13AddHash32),
+    ('shl7shr19Hash32',        32, pseudocode_shl7shr19Hash32),
+    ('sll1AddHash32',          32, pseudocode_sll1AddHash32),
+    ('playWith0xedb88320Hash', 32, pseudocode_playWith0xedb88320Hash),
 ]
 
 
