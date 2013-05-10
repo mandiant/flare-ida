@@ -34,11 +34,13 @@ from PySide.QtCore import Qt
 # Import the compiled UI module
 from shellcodechooser import Ui_ShellcodeChooser
 
+import jayutils
+
 class ShellcodeWidget(QtGui.QDialog):
     def __init__(self, dbstore, params, parent=None):
         QtGui.QDialog.__init__(self, parent)
         try:
-            self.logger = logging.getLogger('ShellcodeWidget')
+            self.logger = jayutils.getLogger('ShellcodeWidget')
             self.logger.debug('Hello debug')
             self.dbstore = dbstore
             self.params = params

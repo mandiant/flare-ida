@@ -32,12 +32,14 @@ import idc
 import idaapi
 import idautils
 
+import jayutils
+
 QT_AVAILABLE = True
 try:
     from PySide import QtGui, QtCore
     from shellcode_widget import ShellcodeWidget
-    print 'Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PySide build available at \n"http://hex-rays.com/products/ida/support/download.shtml"'
 except ImportError:
+    print 'Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PySide build available at \n"http://hex-rays.com/products/ida/support/download.shtml"'
     QT_AVAILABLE = False
 
 class RejectionException(Exception):
@@ -212,7 +214,7 @@ class SearchParams(object):
 class ShellcodeHashSearcher(object):
     PTR_SIZE = 4
     def __init__(self, dbstore, params):
-        self.logger = logging.getLogger('ShellcodeHashSearcher')
+        self.logger = jayutils.getLogger('ShellcodeHashSearcher')
         self.dbstore = dbstore
         self.params = params
         self.hits = []
@@ -324,7 +326,7 @@ class ShellcodeHashSearcher(object):
 class SearchLauncher(object):
     def __init__(self):
         self.params = SearchParams()
-        self.logger = logging.getLogger('SearchLauncher')
+        self.logger = jayutils.getLogger('SearchLauncher')
 
     def run(self):
         try:
@@ -419,25 +421,9 @@ class SearchLauncher(object):
 #
 ###################################################################
 
-def configLogger(rootname=None, level=logging.INFO, customLevels=None):
-    logger = logging.getLogger(rootname)
-    if len(logger.handlers) != 0:
-        return logger
-    logger.setLevel(level)
-    #formatter = logging.Formatter("%(name)s: %(message)s")
-    formatter = logging.Formatter("%(message)s")
-    errStream = logging.StreamHandler(sys.stdout)
-    errStream.setFormatter(formatter)
-    logger.addHandler(errStream)
-    if customLevels is not None:
-        for logName, logLevel in customLevels:
-            tmpLog = logging.getLogger(logName)
-            tmpLog.setLevel(logLevel)
-    return logger
-
 def main():
-    #logger = configLogger('', logging.DEBUG)
-    logger = configLogger('', logging.INFO)
+    #logger = jayutils.configLogger('', logging.DEBUG)
+    logger = jayutils.configLogger('', logging.INFO)
     launcher = SearchLauncher()
     launcher.run()
 

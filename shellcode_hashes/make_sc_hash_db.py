@@ -25,6 +25,7 @@
 import os
 import sys
 import time
+import zlib
 import ctypes
 import os.path
 import sqlite3
@@ -241,6 +242,32 @@ def poisonIvyHash(inStr):
 
 pseudocode_poisonIvyHash = '''Too hard to explain.\nString hash function from POISON IVY RAT.\nSee code for information'''
 
+
+def rol3XorEax(inString):
+    if inString is None:
+        return 0
+    ecx = 0
+    eax = 0
+    for i in inString:
+        eax = eax | ord(i)
+        ecx = ecx ^ eax
+        ecx = rol(ecx, 0x3, 32)
+        ecx += 1
+        eax = 0xffffffff & (eax << 8)
+    return ecx
+
+pseudocode_rol3XorEax = '''eax := 0;
+ecx := 0;
+for c in input_string {
+    eax := eax | c ;
+    ecx := ecx ^ eax;
+    ecx := ROL(ecx, 0x3);
+    ecx : ecx + 1;
+    eax := 0xffffffff & (eax << 8);
+};
+return ecx;
+'''
+
 def rol7AddHash32(inString):
     if inString is None:
         return 0
@@ -256,6 +283,24 @@ for c in input_string {
    acc := acc + c;
 }
 '''
+
+def rol5AddHash32(inString):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = rol(val, 0x5, 32)
+        val += ord(i)
+    return val
+
+pseudocode_rol5AddHash32 = '''acc := 0;
+for c in input_string {
+   acc := ROL(acc, 5):
+   acc := acc + c;
+}
+'''
+
+
 
 def ror7AddHash32(inString):
     if inString is None:
@@ -397,18 +442,24 @@ String hash function from Gatak sample.
 See code for information'''
 
 
+def crc32(inString):
+    return 0xffffffff & (zlib.crc32(inString))
+
 # The list of tuples of (supported hash name, hash size, pseudo_code)
 HASH_TYPES = [
-    ('ror13AddHash32',         32, pseudocode_ror13AddHash32),
-    ('poisonIvyHash',          32, pseudocode_poisonIvyHash),
-    ('rol7AddHash32',          32, pseudocode_rol7AddHash32),
-    ('ror7AddHash32',          32, pseudocode_ror7AddHash32),
-    ('ror9AddHash32',          32, pseudocode_ror9AddHash32),
-    ('ror11AddHash32',         32, pseudocode_ror11AddHash32),
-    ('ror13AddHash32Sub1',     32, pseudocode_ror13AddHash32),
-    ('shl7shr19Hash32',        32, pseudocode_shl7shr19Hash32),
-    ('sll1AddHash32',          32, pseudocode_sll1AddHash32),
+    ('ror13AddHash32',      32, pseudocode_ror13AddHash32),
+    ('poisonIvyHash',       32, pseudocode_poisonIvyHash),
+    ('rol7AddHash32',       32, pseudocode_rol7AddHash32),
+    ('rol5AddHash32',       32, pseudocode_rol5AddHash32),
+    ('rol3XorEax',          32, pseudocode_rol3XorEax),
+    ('ror7AddHash32',       32, pseudocode_ror7AddHash32),
+    ('ror9AddHash32',       32, pseudocode_ror9AddHash32),
+    ('ror11AddHash32',      32, pseudocode_ror11AddHash32),
+    ('ror13AddHash32Sub1',  32, pseudocode_ror13AddHash32),
+    ('shl7shr19Hash32',     32, pseudocode_shl7shr19Hash32),
+    ('sll1AddHash32',       32, pseudocode_sll1AddHash32),
     ('playWith0xedb88320Hash', 32, pseudocode_playWith0xedb88320Hash),
+    ('crc32',               32, 'Standard crc32'),
 ]
 
 
