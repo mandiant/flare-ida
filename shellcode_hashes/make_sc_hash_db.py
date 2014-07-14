@@ -215,7 +215,7 @@ def rol(inVal, numShifts, dataSize=32):
 # Start of hash implementations
 ############################################################
 
-def poisonIvyHash(inStr):
+def poisonIvyHash(inStr,fName):
     #need a null at the end of the string
     if inStr[-1] != '\x00':
         inStr = inStr + '\x00'
@@ -243,7 +243,7 @@ def poisonIvyHash(inStr):
 pseudocode_poisonIvyHash = '''Too hard to explain.\nString hash function from POISON IVY RAT.\nSee code for information'''
 
 
-def rol3XorEax(inString):
+def rol3XorEax(inString,fName):
     if inString is None:
         return 0
     ecx = 0
@@ -268,7 +268,7 @@ for c in input_string {
 return ecx;
 '''
 
-def rol7AddHash32(inString):
+def rol7AddHash32(inString,fName):
     if inString is None:
         return 0
     val = 0
@@ -284,7 +284,7 @@ for c in input_string {
 }
 '''
 
-def rol5AddHash32(inString):
+def rol5AddHash32(inString,fName):
     if inString is None:
         return 0
     val = 0
@@ -302,7 +302,7 @@ for c in input_string {
 
 
 
-def ror7AddHash32(inString):
+def ror7AddHash32(inString,fName):
     if inString is None:
         return 0
     val = 0
@@ -318,7 +318,7 @@ for c in input_string {
 }
 '''
 
-def ror9AddHash32(inString):
+def ror9AddHash32(inString,fName):
     if inString is None:
         return 0
     val = 0
@@ -334,7 +334,7 @@ for c in input_string {
 }
 '''
 
-def ror11AddHash32(inString):
+def ror11AddHash32(inString,fName):
     if inString is None:
         return 0
     val = 0
@@ -350,7 +350,7 @@ for c in input_string {
 }
 '''
              
-def ror13AddHash32(inString):
+def ror13AddHash32(inString,fName):
     if inString is None:
         return 0
     val = 0
@@ -366,9 +366,9 @@ for c in input_string {
 }
 '''
 
-def ror13AddHash32Sub1(inString):
+def ror13AddHash32Sub1(inString,fName):
     '''Same as ror13AddHash32, but subtract 1 afterwards'''
-    return ror13AddHash32(inString) - 1
+    return ror13AddHash32(inString,fName) - 1
 
 pseudocode_ror13AddHash32 = '''acc := 0;
 for c in input_string {
@@ -378,7 +378,7 @@ for c in input_string {
 acc := acc - 1;
 '''
 
-def shl7shr19Hash32(inString):
+def shl7shr19Hash32(inString,fName):
     val = 0
     for i in inString:
         edx = 0xffffffff & (val << 7)
@@ -397,7 +397,7 @@ for c in input_string {
 }
 '''
 
-def sll1AddHash32(inString):
+def sll1AddHash32(inString,fName):
     if inString is None:
         return 0
     val = 0
@@ -416,7 +416,7 @@ for c in input_string {
 }
 '''
 
-def playWith0xedb88320Hash(inString):
+def playWith0xedb88320Hash(inString,fName):
     esi = 0xFFFFFFFF
     for d in inString:
         c = ord(d)
@@ -442,12 +442,45 @@ String hash function from Gatak sample.
 See code for information'''
 
 
-def crc32(inString):
+def crc32(inString,fName):
     return 0xffffffff & (zlib.crc32(inString))
+
+def ror13AddHash32AddDll(inString,fName):
+    dllHash = 0
+    for c in fName:
+        dllHash = ror(dllHash, 0xd, 32)
+        if ord(c) < 97:
+            dllHash = int(dllHash) + ord(c)
+        else:
+            dllHash = int(dllHash) + ord(c) - 32
+        dllHash = ror(dllHash, 0xd, 32)
+    dllHash = ror(dllHash, 0xd, 32)
+    dllHash = ror(dllHash, 0xd, 32)
+    
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = ror(val, 0xd, 32)
+        val += ord(i)
+    val = ror(val, 0xd, 32)
+    val += dllHash
+    if val >= 4294967296:
+        val -= 4294967296
+    return val
+    
+pseudocode_ror13AddHash32AddDll = '''acc := 0;
+for c in input_string {
+   acc := ROR(acc, 13);
+   acc := acc + c;
+}
+acc := acc + ror13add(DllName);
+'''
 
 # The list of tuples of (supported hash name, hash size, pseudo_code)
 HASH_TYPES = [
     ('ror13AddHash32',      32, pseudocode_ror13AddHash32),
+    ('ror13AddHash32AddDll',   32, pseudocode_ror13AddHash32AddDll),
     ('poisonIvyHash',       32, pseudocode_poisonIvyHash),
     ('rol7AddHash32',       32, pseudocode_rol7AddHash32),
     ('rol5AddHash32',       32, pseudocode_rol5AddHash32),
@@ -527,7 +560,7 @@ class ShellcodeDbCreator(object):
                             for hashName in self.hashes.keys():
                                 hashType, hashMeth = self.hashes[hashName]
                                 #print "Trying to hash: %s:%s" % (hashName, sym.name)
-                                symHash = hashMeth(sym.name)
+                                symHash = hashMeth(sym.name,fName)
                                 #print " Done hashing: %08x:%s" % (symHash, sym.name)
                                 if symHash is not None:
                                     self.addSymbolHash(symHash, hashType, libKey, sym.name)
