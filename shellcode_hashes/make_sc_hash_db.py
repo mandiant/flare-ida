@@ -479,20 +479,20 @@ acc := acc + ror13add(DllName);
 
 # The list of tuples of (supported hash name, hash size, pseudo_code)
 HASH_TYPES = [
-    ('ror13AddHash32',      32, pseudocode_ror13AddHash32),
-    ('ror13AddHash32AddDll',   32, pseudocode_ror13AddHash32AddDll),
-    ('poisonIvyHash',       32, pseudocode_poisonIvyHash),
-    ('rol7AddHash32',       32, pseudocode_rol7AddHash32),
-    ('rol5AddHash32',       32, pseudocode_rol5AddHash32),
-    ('rol3XorEax',          32, pseudocode_rol3XorEax),
-    ('ror7AddHash32',       32, pseudocode_ror7AddHash32),
-    ('ror9AddHash32',       32, pseudocode_ror9AddHash32),
-    ('ror11AddHash32',      32, pseudocode_ror11AddHash32),
-    ('ror13AddHash32Sub1',  32, pseudocode_ror13AddHash32),
-    ('shl7shr19Hash32',     32, pseudocode_shl7shr19Hash32),
-    ('sll1AddHash32',       32, pseudocode_sll1AddHash32),
-    ('playWith0xedb88320Hash', 32, pseudocode_playWith0xedb88320Hash),
-    ('crc32',               32, 'Standard crc32'),
+    ('ror13AddHash32',          32, pseudocode_ror13AddHash32),
+    ('ror13AddHash32AddDll',    32, pseudocode_ror13AddHash32AddDll),
+    ('poisonIvyHash',           32, pseudocode_poisonIvyHash),
+    ('rol7AddHash32',           32, pseudocode_rol7AddHash32),
+    ('rol5AddHash32',           32, pseudocode_rol5AddHash32),
+    ('rol3XorEax',              32, pseudocode_rol3XorEax),
+    ('ror7AddHash32',           32, pseudocode_ror7AddHash32),
+    ('ror9AddHash32',           32, pseudocode_ror9AddHash32),
+    ('ror11AddHash32',          32, pseudocode_ror11AddHash32),
+    ('ror13AddHash32Sub1',      32, pseudocode_ror13AddHash32),
+    ('shl7shr19Hash32',         32, pseudocode_shl7shr19Hash32),
+    ('sll1AddHash32',           32, pseudocode_sll1AddHash32),
+    ('playWith0xedb88320Hash',  32, pseudocode_playWith0xedb88320Hash),
+    ('crc32',                   32, 'Standard crc32'),
 ]
 
 

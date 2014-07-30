@@ -42,7 +42,7 @@ class shellcode_search_plugin_t(idaapi.plugin_t):
 
     def run(self, arg):
         #idaapi.msg("Shellcode Hashes run() called with %d!\n" % arg)
-        import shellcode_hash_search
+        idaapi.require('flare.shellcode_hash_search')
         shellcode_hash_search.main()
 
     def term(self):
