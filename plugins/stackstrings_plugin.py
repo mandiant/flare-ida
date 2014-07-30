@@ -19,40 +19,53 @@
 # permissions and limitations under the License.
 ########################################################################
 #
-# IDA Plugin wrapper for shellcode hash search.
+# IDA Plugin wrapper for stack strings search
 #
 ########################################################################
 
+
+import logging
 
 import idc 
 import idautils  
 import idaapi
 
-class shellcode_search_plugin_t(idaapi.plugin_t):
-    flags = idaapi.PLUGIN_UNL
+
+class stackstrings_plugin_t(idaapi.plugin_t):
+    flags = idaapi.PLUGIN_KEEP
     comment = "This is a comment"
 
     help = "This is help"
-    wanted_name = "Shellcode Hashes"
-    #wanted_hotkey = "Alt-F8"
-    wanted_hotkey = ""
+    wanted_name = "StackStrings"
+    wanted_hotkey = "Alt-0"
 
     def init(self):
-        #idaapi.msg("Shellcode Hashes init() called!\n")
-        return idaapi.PLUGIN_OK
+        try:
+            idaapi.msg("StackStrings init() called!\n")
+            return idaapi.PLUGIN_OK
+        except Exception, err:
+            idaapi.msg("Exception during init: %s\n" % str(err))
+        
+        return idaapi.PLUGIN_SKIP
+
 
     def run(self, arg):
-        #idaapi.msg("Shellcode Hashes run() called with %d!\n" % arg)
-        idaapi.require('flare')
-        idaapi.require('flare.shellcode_hash_search')
-        flare.shellcode_hash_search.main()
+        try:
+            idaapi.msg("StackStrings run() called with %d!\n" % arg)
+            idaapi.require('flare')
+            idaapi.require('flare.stackstrings')
+            flare.stackstrings.main()
+            idaapi.msg("StackStrings run() done")
+        except Exception, err:
+            idaapi.msg("Exception during run: %s\n" % str(err))
+            raise
+            
+        idaapi.msg("StackStrings run() complete!\n")
 
     def term(self):
-        #idaapi.msg("Shellcode Hashes term() called!\n")
-        pass
+        idaapi.msg("StackStrings term() called!\n")
 
 def PLUGIN_ENTRY():
-    return shellcode_search_plugin_t()
-
+    return stackstrings_plugin_t()
 
 

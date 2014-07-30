@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # Jay Smith
-# jay.smith@mandiant.com
+# jay.smith@fireeye.com
 # 
 ########################################################################
 # Copyright 2013 Mandiant
+# Copyright 2014 FireEye
 #
 # Mandiant licenses this file to you under the Apache License, Version
 # 2.0 (the "License"); you may not use this file except in compliance with the

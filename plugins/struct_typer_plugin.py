@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # Jay Smith
-# jay.smith@mandiant.com
+# jay.smith@fireeye.com
 # 
 ########################################################################
 # Copyright 2013 Mandiant
+# Copyright 2014 FireEye
 #
 # Mandiant licenses this file to you under the Apache License, Version
 # 2.0 (the "License"); you may not use this file except in compliance with the
@@ -42,8 +43,9 @@ class struct_typer_plugin_t(idaapi.plugin_t):
 
     def run(self, arg):
         idaapi.msg("StructTyper run() called with %d!\n" % arg)
+        idaapi.require('flare')
         idaapi.require('flare.struct_typer')
-        struct_typer.main()
+        flare.struct_typer.main()
 
     def term(self):
         #idaapi.msg("StructTyper term() called!\n")
