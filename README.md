@@ -1,5 +1,5 @@
-# Mandiant Reversing Repository #
-This repository contains a collection of IDA Pro scripts and plugins.
+# FLARE Team Reversing Repository #
+This repository contains a collection of IDA Pro scripts and plugins used by the FireEye Labs Advanced Reverse Engineering (FLARE) team.
 
 ## plugins ##
 
@@ -19,3 +19,5 @@ The shellcode_hashes directory contains the script used to create the database f
 The struct_typer_plugin.py plugin implements the struct typing described here https://www.mandiant.com/blog/applying-function-types-structure-fields-ida/
 
 
+### StackStrings ###
+The stackstrings_plugin.py implements the recovery of manually constructed strings described here (TODO - coming soon!)
