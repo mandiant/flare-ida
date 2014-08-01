@@ -11,13 +11,13 @@ The python directory here can be copied to your %PROGRAMFILES%\IDA\python folder
 ## Provided Plugins ##
 
 ### Shellcode Hashes  ###
-The shellcode_hashes_search_plugin.py IDA plugin implements the hash searching described here https://www.mandiant.com/blog/precalculated-string-hashes-reverse-engineering-shellcode/.
+The shellcode_hashes_search_plugin.py IDA plugin implements the hash searching described here: https://www.mandiant.com/blog/precalculated-string-hashes-reverse-engineering-shellcode/.
 
 The shellcode_hashes directory contains the script used to create the database for the shellcode_hash_search.py script, along with a provided database.
 
 ### Struct Typer ###
-The struct_typer_plugin.py plugin implements the struct typing described here https://www.mandiant.com/blog/applying-function-types-structure-fields-ida/
+The struct_typer_plugin.py plugin implements the struct typing described here: https://www.mandiant.com/blog/applying-function-types-structure-fields-ida/
 
 
 ### StackStrings ###
-The stackstrings_plugin.py implements the recovery of manually constructed strings described here (TODO - coming soon!)
+The stackstrings_plugin.py implements the recovery of manually constructed strings described here: http://www.fireeye.com/blog/technical/malware-research/2014/08/flare-ida-pro-script-series-automatic-recovery-of-constructed-strings-in-malware.html
