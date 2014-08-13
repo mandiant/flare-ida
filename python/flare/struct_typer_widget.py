@@ -1,29 +1,9 @@
 # -*- coding: utf-8 -*-
-########################################################################
-# Copyright 2013 Mandiant
-# Copyright 2014 FireEye
-#
-# Mandiant licenses this file to you under the Apache License, Version
-# 2.0 (the "License"); you may not use this file except in compliance with the
-# License. You may obtain a copy of the License at:
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-# implied. See the License for the specific language governing
-# permissions and limitations under the License.
-########################################################################
-#
-# Attempts to set types for struct members based on searching for
-# like-named types in IDA's type libraries.
-#
-########################################################################
+
 # Form implementation generated from reading ui file 'struct_typer_widget.ui'
 #
-# Created: Fri May  3 16:25:50 2013
-#      by: pyside-uic 0.2.13 running on PySide 1.1.0
+# Created: Wed Aug 13 10:16:29 2014
+#      by: pyside-uic 0.2.15 running on PySide 1.2.1
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -32,12 +12,28 @@ from PySide import QtCore, QtGui
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
-        Dialog.resize(400, 332)
+        Dialog.resize(502, 364)
         self.verticalLayout_2 = QtGui.QVBoxLayout(Dialog)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.verticalLayout = QtGui.QVBoxLayout()
         self.verticalLayout.setObjectName("verticalLayout")
+        self.rb_useStackFrame = QtGui.QRadioButton(Dialog)
+        self.rb_useStackFrame.setObjectName("rb_useStackFrame")
+        self.buttonGroup = QtGui.QButtonGroup(Dialog)
+        self.buttonGroup.setObjectName("buttonGroup")
+        self.buttonGroup.addButton(self.rb_useStackFrame)
+        self.verticalLayout.addWidget(self.rb_useStackFrame)
+        self.rb_useStruct = QtGui.QRadioButton(Dialog)
+        self.rb_useStruct.setChecked(True)
+        self.rb_useStruct.setObjectName("rb_useStruct")
+        self.buttonGroup.addButton(self.rb_useStruct)
+        self.verticalLayout.addWidget(self.rb_useStruct)
         self.listWidget = QtGui.QListWidget(Dialog)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.MinimumExpanding, QtGui.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.listWidget.sizePolicy().hasHeightForWidth())
+        self.listWidget.setSizePolicy(sizePolicy)
         self.listWidget.setObjectName("listWidget")
         self.verticalLayout.addWidget(self.listWidget)
         self.horizontalLayout = QtGui.QHBoxLayout()
@@ -65,5 +61,7 @@ class Ui_Dialog(object):
 
     def retranslateUi(self, Dialog):
         Dialog.setWindowTitle(QtGui.QApplication.translate("Dialog", "StructTyper", None, QtGui.QApplication.UnicodeUTF8))
+        self.rb_useStackFrame.setText(QtGui.QApplication.translate("Dialog", "Current Stack Frame", None, QtGui.QApplication.UnicodeUTF8))
+        self.rb_useStruct.setText(QtGui.QApplication.translate("Dialog", "Structure", None, QtGui.QApplication.UnicodeUTF8))
         self.checkBox.setText(QtGui.QApplication.translate("Dialog", "Prefix RegEx", None, QtGui.QApplication.UnicodeUTF8))
 

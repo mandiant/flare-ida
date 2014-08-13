@@ -111,11 +111,10 @@ def stripNumberedName(name):
         idx -= 1
     return name
 
-def loadMembers(struc, structName):
+def loadMembers(struc, sid):
     '''Returns list of tuples of (offset, memberName, member)'''
     #mixing idc & idaapi, kinda annoying but need low-level idaapi for a 
     # type access, but cant dig into structs...
-    sid = idc.GetStrucIdByName(structName)
     members = []
     off = g_dll.get_struc_first_offset(struc) 
     while off >= 0:
@@ -182,10 +181,36 @@ class StructTypeRunner(object):
             res = dlg.exec_()
             idaapi.set_script_timeout(oldTo)
             if res == QtGui.QDialog.DialogCode.Accepted:
-                structName = dlg.getActiveStruct()
                 regPrefix = dlg.getRegPrefix()
-                self.logger.debug('Dialog result: accepted %s "%s"', type(structName), structName)
-                self.processStruct(regPrefix, structName)
+                sid = None
+                struc = None
+                if dlg.ui.rb_useStackFrame.isChecked():
+                    ea = idc.here()
+                    sid = idc.GetFrame(ea)
+                    struc = idaapi.get_frame(ea)
+                    self.logger.debug('Dialog result: accepted stack frame')
+                    if (sid is None) or (sid == idc.BADADDR):
+                        #i should really figure out which is the correct error case
+                        raise RuntimeError('Failed to get sid for stack frame at 0x%x' % ea) 
+                    if (struc is None) or (struc == 0) or (struc == idc.BADADDR):
+                        raise RuntimeError('Failed to get struc_t for stack frame at 0x%x' % ea)
+                    #need the actual pointer value, not the swig wrapped struc_t
+                    struc= long(struc.this)
+                else:
+                    structName = dlg.getActiveStruct()
+                    self.logger.debug('Dialog result: accepted %s "%s"', type(structName), structName)
+                    sid = idc.GetStrucIdByName(structName)
+                    if (sid is None) or (sid == idc.BADADDR):
+                        #i should really figure out which is the correct error case
+                        raise RuntimeError('Failed to get sid for %s' % structName) 
+                    tid = idaapi.get_struc_id(structName)
+                    if (tid is None) or (tid == 0) or (tid == idc.BADADDR):
+                        #i should really figure out which is the correct error case
+                        raise RuntimeError('Failed to get tid_t for %s' % structName)
+                    struc = g_dll.get_struc(tid)
+                    if (struc is None) or (struc == 0) or (struc == idc.BADADDR):
+                        raise RuntimeError('Failed to get struc_t for %s' % structName)
+                self.processStruct(regPrefix, struc, sid)
             elif res == QtGui.QDialog.DialogCode.Rejected:
                 self.logger.info('Dialog result: canceled by user')
             else:
@@ -207,17 +232,9 @@ class StructTypeRunner(object):
                 pass
         return funcname
 
-    def processStruct(self, regPrefix, structName):
+    def processStruct(self, regPrefix, struc, sid):
         til = ctypes.c_void_p.in_dll(g_dll, 'idati')
-        tid = idaapi.get_struc_id(structName)
-        if (tid is None) or (tid == 0) or (tid == idc.BADADDR):
-            #i should really figure out which is the correct error case
-            raise RuntimeError('Failed to get tid_t for %s' % structName)
-        struc = g_dll.get_struc(tid)
-        if (struc is None) or (struc == 0) or (struc == idc.BADADDR):
-            raise RuntimeError('Failed to get struc_t for %s' % structName)
-
-        members = loadMembers(struc, structName)
+        members = loadMembers(struc, sid)
         for off, name, memb in members:
             funcname  = self.filterName(regPrefix, name)
 
