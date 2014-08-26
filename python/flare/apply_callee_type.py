@@ -278,6 +278,6 @@ def main():
     launcher = ApplyCalleeTypeRunner()
     launcher.run()
 
-#if __name__ == '__main__':
-#    main()
+if __name__ == '__main__':
+    main()
 
