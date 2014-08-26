@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'apply_callee_dialog.ui'
 #
-# Created: Mon Aug 25 09:30:32 2014
+# Created: Tue Aug 26 12:16:07 2014
 #      by: pyside-uic 0.2.15 running on PySide 1.2.1
 #
 # WARNING! All changes made in this file will be lost!
@@ -50,7 +50,7 @@ class Ui_ApplyCalleeDialog(object):
         QtCore.QMetaObject.connectSlotsByName(ApplyCalleeDialog)
 
     def retranslateUi(self, ApplyCalleeDialog):
-        ApplyCalleeDialog.setWindowTitle(QtGui.QApplication.translate("ApplyCalleeDialog", "Dialog", None, QtGui.QApplication.UnicodeUTF8))
+        ApplyCalleeDialog.setWindowTitle(QtGui.QApplication.translate("ApplyCalleeDialog", "ApplyCalleeType", None, QtGui.QApplication.UnicodeUTF8))
         self.label.setText(QtGui.QApplication.translate("ApplyCalleeDialog", "Enter Type\n"
 "Declaration", None, QtGui.QApplication.UnicodeUTF8))
         self.pb_useStandardType.setText(QtGui.QApplication.translate("ApplyCalleeDialog", "Use Standard Type", None, QtGui.QApplication.UnicodeUTF8))

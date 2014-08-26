@@ -24,6 +24,7 @@
 #
 ########################################################################
 
+import sys
 
 import idc 
 import idautils  
@@ -44,9 +45,23 @@ class apply_callee_type_plugin_t(idaapi.plugin_t):
         idaapi.require('flare.apply_callee_type')
         idaapi.require('flare.jayutils')
 
-        self.ex_addmenu_item_ctx = idaapi.add_menu_item("Edit/Operand type/Manual", "Set Callee Type", "Alt-J", 0, doApplyCallee, tuple("hello world"))
-        if self.ex_addmenu_item_ctx  is None:
-            print 'Failed to init apply_callee_type_plugin'
+        #hack -> stashing a flag under idaapi to prevent multiple menu items from appearing
+        if hasattr(sys.modules['idaapi'], '_apply_callee_type_plugin_installFlag'):
+            #print 'Skipping menu install: already present'
+            pass
+        else:
+            self.ex_addmenu_item_ctx = idaapi.add_menu_item(
+                "Edit/Operand type/Manual", 
+                "ApplyCalleeType", 
+                "Alt-J", 
+                0, 
+                doApplyCallee, 
+                tuple("hello world")
+            )
+            if self.ex_addmenu_item_ctx  is None:
+                print 'Failed to init apply_callee_type_plugin'
+
+            setattr(sys.modules['idaapi'], '_apply_callee_type_plugin_installFlag', True)
         return idaapi.PLUGIN_OK
 
     def run(self, arg):
@@ -61,6 +76,6 @@ def PLUGIN_ENTRY():
     return apply_callee_type_plugin_t()
 
 def doApplyCallee(*args):
-    idaapi.msg('doApplyCallee:Calling now\n')
+    #idaapi.msg('doApplyCallee:Calling now\n')
     flare.apply_callee_type.main()
 

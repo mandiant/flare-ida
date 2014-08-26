@@ -210,7 +210,13 @@ class StructTypeRunner(object):
                     struc = g_dll.get_struc(tid)
                     if (struc is None) or (struc == 0) or (struc == idc.BADADDR):
                         raise RuntimeError('Failed to get struc_t for %s' % structName)
-                self.processStruct(regPrefix, struc, sid)
+                foundMembers = self.processStruct(regPrefix, struc, sid)
+                if dlg.ui.rb_useStackFrame.isChecked() and (foundMembers != 0):
+                    #reanalyze current function if we're analyzing a stack frame & found some func pointers
+                    funcstart = idc.GetFunctionAttr(idc.here(), idc.FUNCATTR_START)
+                    funcend = idc.GetFunctionAttr(idc.here(), idc.FUNCATTR_END)
+                    if (funcstart != idc.BADADDR) and (funcend != idc.BADADDR):
+                        idc.AnalyzeArea(funcstart, funcend)
             elif res == QtGui.QDialog.DialogCode.Rejected:
                 self.logger.info('Dialog result: canceled by user')
             else:
@@ -233,8 +239,12 @@ class StructTypeRunner(object):
         return funcname
 
     def processStruct(self, regPrefix, struc, sid):
+        '''
+        Returns the number of identified struct members whose type was found
+        '''
         til = ctypes.c_void_p.in_dll(g_dll, 'idati')
         members = loadMembers(struc, sid)
+        foundFunctions = 0
         for off, name, memb in members:
             funcname  = self.filterName(regPrefix, name)
 
@@ -258,6 +268,7 @@ class StructTypeRunner(object):
             if ret == 0:
                 self.logger.debug('Could not find %s', funcname)
             else:
+                foundFunctions += 1
                 if typ_type[0] != idaapi.BT_FUNC:
                     #not positive that the first type value has to be BT_FUNC or not...
                     # and whether it's important to only apply to funcs or not
@@ -290,6 +301,8 @@ class StructTypeRunner(object):
                         self.logger.info('Failed to set_member_tinfo: %s', name_buffer.value)
                     else:
                         self.logger.info('set_member_tinfo: %s', name_buffer.value)
+        return foundFunctions
+            
 
 def main():
     #logger = jayutils.configLogger('', logging.DEBUG)
