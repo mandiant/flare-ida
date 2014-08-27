@@ -21,3 +21,28 @@ The struct_typer_plugin.py plugin implements the struct typing described here: h
 
 ### StackStrings ###
 The stackstrings_plugin.py implements the recovery of manually constructed strings described here: http://www.fireeye.com/blog/technical/malware-research/2014/08/flare-ida-pro-script-series-automatic-recovery-of-constructed-strings-in-malware.html
+
+### MSDN Annotations ###
+This script for IDA Pro adds MSDN information from a XML file to the database.
+The following functionality is included:
+
+  - Backup the original database
+  - Retrieve all imported functions
+  - Import function descriptions
+  - Import argument descriptions
+  - Create custom enumerations for identified constants including descriptions
+  - Rename constants to their readable values
+
+#### MSDN Annotations Usage ####
+
+TL;DR: In IDA run *annotate_IDB_MSDN.py*.
+
+All files (IDAPython scripts, XML parser, MSDN information XML file, etc.) 
+should be located in the same directory accessible by IDA Pro.
+In IDA use *File - Script file...* (ALT + F7) to open **annotate_IDB_MSDN.py**.
+The form will allow you to change the settings and annotate the IDB file after
+you click OK.
+
+After executing the script once, *View - Recent scripts* (ALT + F9) can be used
+as well.
+
