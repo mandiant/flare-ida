@@ -36,8 +36,7 @@ class apply_callee_type_plugin_t(idaapi.plugin_t):
 
     help = "This is help"
     wanted_name = "ApplyCalleeType"
-    #wanted_hotkey = "Alt-F8"
-    wanted_hotkey = ""
+    wanted_hotkey = "Alt-J"
 
     def init(self):
         idaapi.msg('apply_callee_type_plugin:init\n')
@@ -66,6 +65,7 @@ class apply_callee_type_plugin_t(idaapi.plugin_t):
 
     def run(self, arg):
         idaapi.msg('apply_callee_type_plugin:run\n')
+        flare.apply_callee_type.main()
 
     def term(self):
         idaapi.msg('apply_callee_type_plugin:term\n')
