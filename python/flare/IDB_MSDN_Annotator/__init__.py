@@ -126,10 +126,11 @@ def add_fct_descr(ea, function, rep):
 
 def get_end_of_last_segment():
     """ Return the last segment's end address. """
-    segment = idaapi.BADADDR
+    last_ea = 0
     for segment in idautils.Segments():
-        pass
-    return idc.SegEnd(segment)
+        if idc.SegEnd(segment) > last_ea:
+            last_ea = idc.SegEnd(segment)
+    return last_ea
 
 
 def expand_segment(ea):
