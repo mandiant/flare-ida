@@ -356,7 +356,7 @@ def make_func_sigs(config):
         n = get_func_qty()
         for i, f in enumerate(get_functions()):
             try:
-                logger.info("[ %d / %d ] %s %s", i, n, get_name(0, f.startEA), hex(f.startEA))
+                logger.info("[ %d / %d ] %s %s", i + 1, n, get_name(0, f.startEA), hex(f.startEA))
                 sigs.append(make_func_sig(config, f))
             except FuncTooShortException:
                 pass
