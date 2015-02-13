@@ -1,6 +1,7 @@
 import json
 import logging
 import binascii
+import itertools
 from collections import namedtuple
 
 from idc import *
@@ -15,6 +16,24 @@ ENTRY_POINT_FUNCTIONS = 3
 ALL_FUNCTIONS = 4
 USER_SELECT_FUNCTION = 5
 FUNCTION_MODE_MAX = USER_SELECT_FUNCTION
+
+
+# via: http://stackoverflow.com/questions/9816603/range-is-too-large-python
+# In Python 2.x, `xrange` can only handle Python 2.x ints,
+# which are bound by the native long integer size of the platform.
+# `range` allocates a list with all numbers beforehand on Python 2.x,
+# and is therefore unsuitable for large arguments.
+def zrange(*args):
+    start = 0
+    end = 0
+    if len(args) == 1:
+        end = args[0]
+    elif len(args) == 2:
+        start = args[0]
+        end = args[1]
+    else:
+        raise RuntimeError("Invalid arguments provided to zrange: {:s}".format(str(args)))
+    return iter(itertools.count(start).next, end)
 
 
 def get_ida_logging_handler():
@@ -102,7 +121,7 @@ def crc16(data, crc):
 
 
 def get_functions():
-   for i in xrange(get_func_qty()):
+   for i in zrange(get_func_qty()):
         yield getn_func(i)
 
 
@@ -140,7 +159,7 @@ def find_ref_loc(config, ea, ref):
     # https://github.com/nihilus/idb2pat/blob/master/idb2pat.cpp#L156
 
     if isCode(getFlags(ea)):
-        for i in xrange(ea, get_item_end(ea) - config.pointer_size):
+        for i in zrange(ea, get_item_end(ea) - config.pointer_size):
             if get_long(i) == ref:
                 return i
 
@@ -193,7 +212,7 @@ def make_func_sig(config, func):
             ref_loc = find_ref_loc(config, ea, ref)
             if ref_loc != BADADDR:
                 logger.debug("  ref loc: %s", hex(ref_loc))
-                for i in xrange(config.pointer_size):
+                for i in zrange(config.pointer_size):
                     logger.debug("    variable %s", hex(ref_loc + i))
                     variable_bytes.add(ref_loc + i)
                 refs[ref_loc] = ref
@@ -206,7 +225,7 @@ def make_func_sig(config, func):
                 ref_loc = find_ref_loc(config, ea, ref)
                 if ref_loc != BADADDR:
                     logger.debug("  ref loc: %s", hex(ref_loc))
-                    for i in xrange(config.pointer_size):
+                    for i in zrange(config.pointer_size):
                         logger.debug("    variable %s", hex(ref_loc + i))
                         variable_bytes.add(ref_loc + i)
                     refs[ref_loc] = ref
@@ -220,7 +239,7 @@ def make_func_sig(config, func):
                     ref_loc = find_ref_loc(config, ea, ref)
                     if BADADDR != ref_loc:
                         logger.debug("  ref loc: %s", hex(ref_loc))
-                        for i in xrange(config.pointer_size):
+                        for i in zrange(config.pointer_size):
                             logger.debug("    variable %s", hex(ref_loc + i))
                             variable_bytes.add(ref_loc + i)
                         refs[ref_loc] = ref
@@ -229,7 +248,7 @@ def make_func_sig(config, func):
 
     sig = ""
     # first 32 bytes, or til end of function
-    for ea in xrange(func.startEA, min(func.startEA + 32, func.endEA)):
+    for ea in zrange(func.startEA, min(func.startEA + 32, func.endEA)):
         if ea in variable_bytes:
             sig += ".."
         else:
@@ -237,9 +256,9 @@ def make_func_sig(config, func):
 
     sig += ".." * (32 - (len(sig) / 2))
 
-    crc_data = [0 for i in xrange(256)]
+    crc_data = [0 for i in zrange(256)]
     # for 255 bytes starting at index 32, or til end of function, or variable byte
-    for i in xrange(32, min(func.endEA - func.startEA, 255 + 32)):
+    for i in zrange(32, min(func.endEA - func.startEA, 255 + 32)):
         if i in variable_bytes:
             break
         crc_data[i - 32] = get_byte(func.startEA + i)
@@ -340,7 +359,7 @@ def make_func_sigs(config):
                         hex(f.startEA), get_name(0, f.startEA) or "")
 
     elif config.mode == ENTRY_POINT_FUNCTIONS:
-        for i in xrange(get_func_qty()):
+        for i in zrange(get_func_qty()):
             f = get_func(get_entry(get_entry_ordinal(i)))
             if f is not None:
                 try:
