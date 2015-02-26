@@ -98,6 +98,11 @@ class ApplyCalleeTypeRunner(object):
             return
 
         tuple = idaapi.get_named_type(sym.til, sym.name, 0)
+
+        if tuple == None:
+            self.logger.debug('Could not find %s', sym.name)
+            return
+
         tinfo = idaapi.tinfo_t()
         tinfo.deserialize(sym.til, tuple[1], tuple[2])
 
