@@ -494,6 +494,22 @@ for c in input_string {
 acc := acc + ror13add(DllName);
 '''
 
+def mult21AddHash32(inString,fName):
+    acc = 0
+    for i in inString:
+        acc = 0xffffffff & (acc * 0x21)
+        acc = 0xffffffff & (acc + ord(i))
+    return acc
+
+
+pseudocode_hashMult21 = '''acc := 0;
+for c in input_string {
+   acc := acc * 0x21;
+   acc := acc + c;
+}
+'''
+
+
 # The list of tuples of (supported hash name, hash size, pseudo_code)
 HASH_TYPES = [
     ('ror13AddHash32',          32, pseudocode_ror13AddHash32),
@@ -511,6 +527,7 @@ HASH_TYPES = [
     ('sll1AddHash32',           32, pseudocode_sll1AddHash32),
     ('playWith0xedb88320Hash',  32, pseudocode_playWith0xedb88320Hash),
     ('crc32',                   32, 'Standard crc32'),
+    ('mult21AddHash32',         32, pseudocode_hashMult21),
 ]
 
 
