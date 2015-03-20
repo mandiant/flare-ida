@@ -46,3 +46,7 @@ you click OK.
 After executing the script once, *View - Recent scripts* (ALT + F9) can be used
 as well.
 
+### MSDN Annotations Requirements ####
+
+Download and install an offline version of the MSDN documentationYou can download the Microsoft Windows SDK MSDN documentation. The standalone installer can be downloaded from http://www.microsoft.com/en-us/download/details.aspx?id=18950. Installation is described here: https://www.fireeye.com/blog/threat-research/2014/09/flare-ida-pro-script-series-msdn-annotations-ida-pro-for-malware-analysis.html
+
