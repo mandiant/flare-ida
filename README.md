@@ -46,3 +46,7 @@ you click OK.
 After executing the script once, *View - Recent scripts* (ALT + F9) can be used
 as well.
 
+### ApplyCalleeType ###
+This plugin allows you to specify or choose a function type for indirect calls as described here: https://www.fireeye.com/blog/threat-research/2015/04/flare_ida_pro_script.html
+
+
