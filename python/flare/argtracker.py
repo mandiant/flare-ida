@@ -48,40 +48,33 @@ from visgraph import pathcore as vg_path
 ########################################################################
 
 class RegMonitor(viv_imp_monitor.EmulationMonitor):
+    '''
+    This tracks all register changes, even if it's not currently an interesting reg
+    because we need to trace register changes backwards.
+    '''
 
     def __init__(self, regs):
         viv_imp_monitor.EmulationMonitor.__init__(self)
-        self.logger = jayutils.getLogger('RegMonitor')
+        self.logger = jayutils.getLogger('argracker.RegMonitor')
         self.regs = regs[:]
         self.reg_map = {}
 
     def prehook(self, emu, op, starteip):
-        #self.reg_map[starteip] = emu.getRegisterSnap()
         try:
             #self.logger.debug('prehook:  0x%08x', starteip)
-            #self.cachedRegs = emu.getRegisterSnap()
             self.cachedRegs = emu.getRegisters()
             self.startEip = starteip
-            #self.logger.debug('Using cached prehook regs: %s', pprint.pformat(self.cachedRegs))
-            #print 'Using cached prehook regs: %s' % pprint.pformat(self.cachedRegs)
         except Exception, err:
             self.logger.exception('Error in prehook: %s', str(err))
 
     def posthook(self, emu, op, endeip):
-        #self.cachedRegs = emu.getRegisterSnap()
         try:
             #self.logger.debug('posthook: 0x%08x', endeip)
-            #curRegs = emu.getRegisterSnap()
             curRegs = emu.getRegisters()
             curDict = {}
-            #self.logger.debug('Examining current registers: %s', pprint.pformat(curRegs))
-            #print 'Examining current registers: %s' % pprint.pformat(curRegs)
             for name, val in curRegs.items():
-                #self.logger.debug('     Examining reg: %s', name)
-                #if name in self.regs and self.cachedRegs.has_key(name) and (self.cachedRegs[name] != val):
-                if name in self.regs and (self.cachedRegs[name] != val):
+                if (self.cachedRegs[name] != val):
                     curDict[name] = val
-                    #self.logger.debug('0x%08x: Found overwritten reg: %s:=0x%x', self.startEip, name, val)
             if len(curDict) != 0:
                 self.reg_map[self.startEip] = curDict
         except Exception, err:
@@ -176,12 +169,12 @@ class TrackerState(object):
         if (writeVa in self.stackArgLocs) and (self.getStackArgNum(writeVa) not in self.resultArgs.keys()):
             #it's a stack arg value
             pc, value = transformWriteLogEntry(wlogEntry)
-            self.tracker.logger.debug('writelog 0x%08x: Found stack arg %d: 0x%08x', pc, self.getStackArgNum(writeVa), value)
+            #self.tracker.logger.debug('writelog 0x%08x: Found stack arg %d: 0x%08x', pc, self.getStackArgNum(writeVa), value)
             self.saveResult(writeVa, pc, value)
             return
 
         if writeVa not in self.tempMapping.keys():
-            self.tracker.logger.debug('writelog 0x%08x: not interesting', pc)
+            #self.tracker.logger.debug('writelog 0x%08x: not interesting', pc)
             return
 
         #argName: the actual value we're tracing back
@@ -200,7 +193,7 @@ class TrackerState(object):
         else:
             #TODO: any other data movement instructions need to be traced rahter
             # than using the observed write log value?
-            self.tracker.logger.debug('writelog 0x%08x: found (default): 0x%08x', pc, value)
+            #self.tracker.logger.debug('writelog 0x%08x: found (default): 0x%08x', pc, value)
             self.saveResult(argName, pc, value)
             return
 
@@ -209,11 +202,11 @@ class TrackerState(object):
         if optype == idc.o_reg:
             #need to trace the new reg now
             newReg = idc.GetOpnd(pc, srcOpIdx)
-            self.tracker.logger.debug('writelog 0x%08x tracing: (%s): %s', pc, self.getArgNameRep(argName), newReg)
+            #self.tracker.logger.debug('writelog 0x%08x tracing: (%s): %s', pc, self.getArgNameRep(argName), newReg)
             self.tempMapping[newReg] = argName
         else:
             #not a register, so currently assuming we can use the stored value
-            self.tracker.logger.debug('writelog 0x%08x: found (non-reg): 0x%08x', pc, value)
+            #self.tracker.logger.debug('writelog 0x%08x: found (non-reg): 0x%08x', pc, value)
             self.saveResult(argName, pc, value)
 
     def getArgNameRep(self, argName):
@@ -241,22 +234,22 @@ class TrackerState(object):
 
     def processRegMon(self, tracker, cVa):
         if tracker.regMon is None:
-            tracker.logger.debug('regmon: regMon is empty')
+            #tracker.logger.debug('regmon: regMon is empty')
             return
         regMods = tracker.regMon.reg_map.get(cVa)
         if regMods is None:
-            tracker.logger.debug('regmon 0x%08x: no entry in reg_map', cVa)
+            #tracker.logger.debug('regmon 0x%08x: no entry in reg_map', cVa)
             return
         #figure out if one of the monitored regs is modified in this instruction
         # and if has not already been stored -> just want the first reg value
         regMods = self.tracker.regMon.reg_map[cVa]
-        self.tracker.logger.debug('regmon 0x%08x: examining %d items: %r', cVa, len(regMods), regMods)
+        #self.tracker.logger.debug('regmon 0x%08x: examining %d items: %r', cVa, len(regMods), regMods)
         for reg in regMods:
             interesting1 = (reg in self.regs) and (reg not in self.resultArgs.keys())
             interesting2 = (reg in self.tempMapping.keys())
             if (not interesting1) and (not interesting2):
                 #modified reg isn't interesting: either a function arg or a temp traced value
-                self.tracker.logger.debug('regmon 0x%08x: not interesting: %s', cVa, reg)
+                #self.tracker.logger.debug('regmon 0x%08x: not interesting: %s', cVa, reg)
                 continue
             mnem = idc.GetMnem(cVa)
             argName = reg
@@ -270,21 +263,21 @@ class TrackerState(object):
                 if rlogEntry is None:
                     raise RuntimeError('readlog entry does not exist for a pop')
                 pc, readVa, bytes = rlogEntry
-                self.tracker.logger.debug('regmon 0x%08x tracing (pop): %s (%s): 0x%x', cVa, argName, reg, readVa)
+                #self.tracker.logger.debug('regmon 0x%08x tracing (pop): %s (%s): 0x%x', cVa, argName, reg, readVa)
                 self.tempMapping[readVa] = argName
             elif mnem.startswith('mov'):
                 if idc.GetOpType(cVa, 1) == idc.o_reg:
                     #change to track this reg backwards
-                    newReg = idc.GetOp
-                    self.tracker.logger.debug('regmon 0x%08x tracing (mov): %s (%s)', cVa, argName, reg)
+                    newReg = idc.GetOpnd(cVa, 1)
+                    #self.tracker.logger.debug('regmon 0x%08x tracing (mov): %s (%s)', cVa, argName, newReg)
                     self.tempMapping[newReg] = argName
                 else:
                     #not a register, use the modified result otherwise?
-                    self.tracker.logger.debug('regmon 0x%08x found (mov): %s (%s): 0x%x', cVa, argName, reg, regMods[reg])
+                    #self.tracker.logger.debug('regmon 0x%08x found (mov): %s (%s): 0x%x', cVa, argName, reg, regMods[reg])
                     self.saveResult(argName, cVa, regMods[reg])
             else:
                 #TODO: any other data movement instructions that should be traced back?
-                self.tracker.logger.debug('regmon 0x%08x found (default): %s (%s): 0x%x', cVa, argName, reg, regMods[reg])
+                #self.tracker.logger.debug('regmon 0x%08x found (default): %s (%s): 0x%x', cVa, argName, reg, regMods[reg])
                 self.saveResult(argName, cVa, regMods[reg])
 
     def setStackArgLocs(self, baseEntry, num, regs):
@@ -307,8 +300,8 @@ class TrackerState(object):
 
 class ArgTracker(object):
 
-    def __init__(self, vw):
-        self.logger = jayutils.getLogger('ArgTracker')
+    def __init__(self, vw, maxIters=1000):
+        self.logger = jayutils.getLogger('argracker.ArgTracker')
         self.logger.debug('Starting up here')
         self.vw = vw
         self.lastFunc = 0
@@ -316,6 +309,7 @@ class ArgTracker(object):
         self.codesize = jayutils.getx86CodeSize()
         self.ptrsize = self.codesize/8
         self.queue = []
+        self.maxIters = maxIters
 
     def printWriteLog(self, wlog):
         for ent in wlog:
@@ -352,11 +346,6 @@ class ArgTracker(object):
         if funcStart != self.lastFunc:
             emu = self.vw.getEmulator(True, True)
             self.logger.debug('Generating va_write_map for function 0x%08x', funcStart)
-            #if len(regs) == 0:
-            #    self.regMon = None
-            #else:
-            #    self.regMon = RegMonitor(regs)
-            #    emu.setEmulationMonitor(self.regMon)
             self.regMon = RegMonitor(regs)
             emu.setEmulationMonitor(self.regMon)
             emu.runFunction(funcStart, maxhit=1, maxloop=1)
@@ -377,98 +366,47 @@ class ArgTracker(object):
             self.logger.error('Node does not have write log. Requires a call instruction (which writes to the stack) for this to work: 0x%08x', va)
             return []
         self.startSp = baseEntry[1]
-
-        #initState = self.getInitTrackerState(baseEntry, num, regs)
-        #initState = TrackerState(baseEntry, num, regs)
-
-        #startSp = baseEntry[1]
-        ## desiredSp: the stack write addressses that correspond to the arguments we want
-        #desiredSp = [startSp + self.ptrsize*(1+i) for i in range(num)]
-        #self.logger.debug('Starting SP: 0x%08x', startSp)
-        #self.logger.debug('Desired SP: %s', ' '.join([hex(i) for i in desiredSp]))
-
         return self.analyzeTracker(baseEntry, va, num, regs)
-
-        ##queue is a tuple of (address, 
-        #queue = [ (va, {}) ]
-        #while len(queue) != 0:
-        #    #if count > 2000:
-        #    if count > 100:
-        #        self.logger.error('Error in graph traversal: loop count = %d', count)
-        #        break
-        #    cVa, cArgs = queue.pop(0)
-        #    self.logger.debug('Examining 0x%08x: %s' , cVa, str(cArgs))
-        #    wlogEntry = self.va_write_map.get(cVa, None)
-        #    if (wlogEntry is not None) and (wlogEntry[1] in desiredSp):
-        #        argNum = (wlogEntry[1] - startSp)/self.ptrsize
-        #        self.logger.debug('Examining argnum %d at wlogEntry:', argNum)
-        #        self.logger.debug('%s', formatWriteLogEntry(wlogEntry))
-        #        if not cArgs.has_key(argNum):
-        #            cArgs[argNum] = wlogEntry
-        #        #if argNum == num:
-        #        #    self.logger.debug('Yep, appending')
-        #        #    ret.append(cArgs)
-        #        #else:
-        #        #    self.logger.debug('Nope: %d is not %d. Queuing prev items' , argNum, num)
-        #        #    for lva, lsize, ltype, linfo in jayutils.getAllXrefsTo(self.vw, cVa):
-        #        #        queue.append( (lva, copy.copy(cArgs)) )
-
-        #    if (self.regMon is not None) and (self.regMon.reg_map.has_key(cVa)):
-        #        #figure out if one of the monitored regs is modified in this instruction
-        #        # and if has not already been stored -> just want the first reg value
-        #        regMods = self.regMon.reg_map[cVa]
-        #        for reg in regs:
-        #            if regMods.has_key(reg) and not cArgs.has_key(reg):
-        #                cArgs[reg] = (cVa, regMods[reg])
-        #                self.logger.debug('Found reg: %s: 0x%x', reg, regMods[reg])
-
-        #    if self.isCargsComplete(cArgs, num, regs):
-        #        self.logger.debug('Yep, appending')
-        #        ret.append(cArgs)
-        #    else:
-        #        #else queue all xrefs to this piece
-        #        # orange TODO: limit xref type????? - prevent accidentally leaving function??
-        #        # orange TODO: filter out calls to current inst & ignore??
-        #        self.logger.debug('Not complete: queuing prev items')
-        #        for lva, lsize, ltype, linfo in jayutils.getAllXrefsTo(self.vw, cVa):
-        #            queue.append( (lva, copy.copy(cArgs)) )
-        #    #orange TODO: need to prevent/detect looping??!?!?!
-        #    #if cVa in touched:
-        #    #    continue
-        #    count += 1
-        #return self.ret
 
     def analyzeTracker(self, baseEntry, va, num, regs):
         funcStart = idc.GetFunctionAttr(va, idc.FUNCATTR_START)
         initState = TrackerState(self, baseEntry, num, regs)
         count = 0
         ret = []
+        touched = set()
         self.queue = [ (va, initState) ]
         while len(self.queue) != 0:
-            if count > 500:
-                self.logger.error('Max graph traversal reached: %d', count)
+            if count > self.maxIters:
+                self.logger.error('Max graph traveral iterations reached: (0x%08x) %d. Stopping early. Consider increasing ArgTracker maxIters (unless this is a bug)', va, count)
                 break
             cVa, cState = self.queue.pop(0)
-            self.logger.debug('Examining 0x%08x: %s' , cVa, str(cState))
+            touched.add(cVa)
+            #self.logger.debug('Examining 0x%08x: %s', cVa, str(cState))
+            #self.logger.debug('Current tempMapping: 0x%08x %s', cVa, pprint.pformat(cState.tempMapping))
             try:
                 cState.processWriteLog(self, cVa)
-                self.logger.debug('writelog 0x%08x done', cVa)
+                #self.logger.debug('writelog 0x%08x done', cVa)
                 cState.processRegMon(self, cVa)
-                self.logger.debug('regmon 0x%08x done', cVa)
+                #self.logger.debug('regmon 0x%08x done', cVa)
             except Exception, err:
                 self.logger.exception('Error in process: %s', str(err))
                 return []
             if cState.isComplete():
-                self.logger.debug('Yep, appending')
+                #self.logger.debug('Yep, appending')
                 ret.append(cState.resultArgs)
             else:
                 if cVa == funcStart:
-                    self.logger.debug('Skipping xref queueing: hit function start')
+                    #self.logger.debug('Skipping xref queueing: hit function start')
+                    pass
                 else:
-                    self.logger.debug('Not complete: queuing prev items')
+                    #self.logger.debug('Not complete: queuing prev items')
                     for ref in idautils.CodeRefsTo(cVa, True):
-                        self.logger.debug('Queueing 0x%08x -> 0x%08x', cVa, ref)
-                        self.queue.append( (ref, cState.copy()) )
+                        if ref in touched:
+                            #self.logger.debug('Skip queueing (touched) 0x%08x -> 0x%08x', cVa, ref)
+                            pass
+                        else:
+                            #self.logger.debug('Queueing 0x%08x -> 0x%08x', cVa, ref)
+                            self.queue.append( (ref, cState.copy()) )
             count += 1
         return ret
 
@@ -478,7 +416,6 @@ def main():
     jayutils.configLogger(None, logging.INFO)
     logger = jayutils.getLogger('')
     logger.debug('Starting up in main')
-    #name = idc.AskStr('CreateThread', 'Enter function to find args for')
     #name = idc.AskStr('CreateThread', 'Enter function to find args for')
     #argNum = idc.AskLong(6)
 
@@ -499,8 +436,8 @@ def main():
         argsList = tracker.getPushArgs(xref.frm, 6)
         for argDict in argsList:
             print '-'*60
-            wlog = argDict[3]
-            print '0x%08x: 0x%08x: 0x%08x' % (xref.frm, wlog[0], struct.unpack_from('<I', wlog[2])[0])
+            pc, value = argDict[3]
+            print '0x%08x: 0x%08x: 0x%08x' % (xref.frm, pc, value)
 
 if __name__ == '__main__':
     main()
