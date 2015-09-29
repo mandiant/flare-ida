@@ -81,7 +81,7 @@ class RegMonitor(viv_imp_monitor.EmulationMonitor):
                 #if name in self.regs and self.cachedRegs.has_key(name) and (self.cachedRegs[name] != val):
                 if name in self.regs and (self.cachedRegs[name] != val):
                     curDict[name] = val
-                    self.logger.debug('0x%08x: Found overwritten reg: %s:=0x%x', self.startEip, name, val)
+                    #self.logger.debug('0x%08x: Found overwritten reg: %s:=0x%x', self.startEip, name, val)
             if len(curDict) != 0:
                 self.reg_map[self.startEip] = curDict
         except Exception, err:
@@ -173,7 +173,7 @@ class TrackerState(object):
         if (wlogEntry is None):
             return
         pc, writeVa, bytes = wlogEntry
-        if (writeVa in self.stackArgLocs) and (writeVa not in self.resultArgs.keys()):
+        if (writeVa in self.stackArgLocs) and (self.getStackArgNum(writeVa) not in self.resultArgs.keys()):
             #it's a stack arg value
             pc, value = transformWriteLogEntry(wlogEntry)
             self.tracker.logger.debug('writelog 0x%08x: Found stack arg %d: 0x%08x', pc, self.getStackArgNum(writeVa), value)
@@ -260,6 +260,8 @@ class TrackerState(object):
                 continue
             mnem = idc.GetMnem(cVa)
             argName = reg
+            if interesting1:
+                self.regs.remove(reg)
             if interesting2:
                 argName = self.tempMapping.pop(reg)
             if mnem.startswith('pop'):
@@ -313,7 +315,6 @@ class ArgTracker(object):
         self.va_write_map = None
         self.codesize = jayutils.getx86CodeSize()
         self.ptrsize = self.codesize/8
-        ret = []
         self.queue = []
 
     def printWriteLog(self, wlog):
@@ -338,18 +339,19 @@ class ArgTracker(object):
         count = 0
         touched = []
 
-        func = self.vw.getFunction(va)
-        if func is None:
-            self.logger.error('Could not get function start from vw 0x%08x -> has analysis been done???', va)
-            return self.ret
+        #func = self.vw.getFunction(va)
+        #if func is None:
+        #    self.logger.error('Could not get function start from vw 0x%08x -> has analysis been done???', va)
+        #    return []
         funcStart = idc.GetFunctionAttr(va, idc.FUNCATTR_START)
-        if func != funcStart:
-            self.logger.error('IDA & vivisect disagree over function start. Needs to be addressed before process')
-            return
+        #if func != funcStart:
+        #    self.logger.error('IDA & vivisect disagree over function start. Needs to be addressed before process')
+        #    self.logger.error(' IDA: 0x%08x. vivisect: 0x%08x', funcStart, func)
+        #    return []
         #map a every (?) va in a function to the pathnode it was found in
-        if func != self.lastFunc:
+        if funcStart != self.lastFunc:
             emu = self.vw.getEmulator(True, True)
-            self.logger.debug('Generating va_write_map for function 0x%08x', func)
+            self.logger.debug('Generating va_write_map for function 0x%08x', funcStart)
             #if len(regs) == 0:
             #    self.regMon = None
             #else:
@@ -357,23 +359,23 @@ class ArgTracker(object):
             #    emu.setEmulationMonitor(self.regMon)
             self.regMon = RegMonitor(regs)
             emu.setEmulationMonitor(self.regMon)
-            emu.runFunction(func, maxhit=1, maxloop=1)
+            emu.runFunction(funcStart, maxhit=1, maxloop=1)
             #cache the last va_write_map for a given function
             self.va_write_map = {}
             self.va_read_map = {}
-            self.lastFunc = func
+            self.lastFunc = funcStart
             jayutils.path_bfs(emu.path, build_emu_va_map, res=self.va_write_map, emu=emu, logtype='writelog')
             jayutils.path_bfs(emu.path, build_emu_va_map, res=self.va_read_map, emu=emu, logtype='readlog')
         else:
             self.logger.debug('Using cached va_write_map')
-        self.logger.debug('Len va_write_map: %d', len(self.va_write_map))
-        for cVa, wlog in self.va_write_map.items():
-            self.logger.debug('0x%08x: %s', cVa, formatWriteLogEntry(wlog))
+        #self.logger.debug('Len va_write_map: %d', len(self.va_write_map))
+        #for cVa, wlog in self.va_write_map.items():
+        #    self.logger.debug('0x%08x: %s', cVa, formatWriteLogEntry(wlog))
 
         baseEntry = self.va_write_map.get(va, None)
         if baseEntry is None:
             self.logger.error('Node does not have write log. Requires a call instruction (which writes to the stack) for this to work: 0x%08x', va)
-            return self.ret
+            return []
         self.startSp = baseEntry[1]
 
         #initState = self.getInitTrackerState(baseEntry, num, regs)
