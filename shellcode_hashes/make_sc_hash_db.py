@@ -541,6 +541,23 @@ for c in input_string {
 }
 '''
 
+def rol7AddXor2Hash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = rol(val, 0x7, 32)
+        val += (ord(i) ^ 2)
+    return val
+
+pseudocode_rol7AddXor2Hash32 = '''acc := 0;
+for c in input_string {
+   acc := ROL(acc, 7):
+   acc := acc + (c ^ 2);
+}
+'''
+
+
 
 
 
@@ -564,6 +581,7 @@ HASH_TYPES = [
     ('mult21AddHash32',         32, pseudocode_hashMult21),
     ('add1505Shl5Hash32',       32, pseudocode_add1505Shl5Hash32),
     ('rol7XorHash32',           32, pseudocode_rol7XorHash32),
+    ('rol7AddXor2Hash32',       32, pseudocode_rol7AddXor2Hash32),
 ]
 
 
