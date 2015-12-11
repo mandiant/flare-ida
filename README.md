@@ -54,3 +54,14 @@ This plugin allows you to specify or choose a function type for indirect calls a
 ### idb2pat ###
 This script allows you to easily generate function patterns from an existing IDB database that can then be turned into FLIRT signatures to help identify similar functions in new files. More information is available at:
 https://www.fireeye.com/blog/threat-research/2015/01/flare_ida_pro_script.html
+
+
+### argtracker ###
+This utility can help you identify static arguments to functions used within a program. This is most commonly used to extract arguments to string decoder functions. Example usage is available in 
+
+* examples/argtracker_example1.py
+* examples/argtracker_example2.py
+
+A blog post with further information is available at:
+
+https://www.fireeye.com/blog/threat-research/2015/11/flare_ida_pro_script.html
