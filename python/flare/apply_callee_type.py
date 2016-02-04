@@ -43,32 +43,6 @@ import jayutils
 
 from apply_callee_type_widget import Ui_ApplyCalleeDialog
 
-############################################################
-# Several type-related functions aren't accessibly via IDAPython
-# so have to do things with ctypes
-idaname = "ida64" if idc.__EA64__ else "ida"
-if sys.platform == "win32":
-    g_dll = ctypes.windll[idaname + ".wll"]
-elif sys.platform == "linux2":
-    g_dll = ctypes.cdll["lib" + idaname + ".so"]
-elif sys.platform == "darwin":
-    g_dll = ctypes.cdll["lib" + idaname + ".dylib"]
-
-############################################################
-# Specifying function types for a few IDA SDK functions to keep the 
-# pointer-to-pointer args clear.
-get_named_type = g_dll.get_named_type
-get_named_type.argtypes = [
-    ctypes.c_void_p,                                #const til_t *ti,
-    ctypes.c_char_p,                                #const char *name,
-    ctypes.c_int,                                   #int ntf_flags,
-    ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const type_t **type=NULL,
-    ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const p_list **fields=NULL,
-    ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const char **cmt=NULL,
-    ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const p_list **fieldcmts=NULL,
-    ctypes.POINTER(ctypes.c_ulong),                 #sclass_t *sclass=NULL,
-    ctypes.POINTER(ctypes.c_ulong),                 #uint32 *value=NULL);
-]
 
 def predFunc(*args):
     print 'Running predFunc: %s' % str(args)
@@ -107,6 +81,64 @@ class ApplyCalleeTypeRunner(object):
         return tinfo
 
     def getBuiltinGlobalType(self):
+
+        # Ensure proper IDA Python methods are exposed
+        if hasattr(idaapi, "get_named_type") and hasattr(idaapi.tinfo_t, "deserialize"):
+            return self.getBuiltinGlobalTypePython()
+
+        # Fall back to calling exports directly with Ctypes
+        else:
+            return self.getBuiltinGlobalTypeCtypes()
+
+    def getBuiltinGlobalTypePython(self):
+        self.logger.debug('Getting GlobalType the Python way')
+        sym = idaapi.til_symbol_t()
+        ret = idaapi.choose_named_type2(idaapi.cvar.idati, 'Choose type to apply', idaapi.NTF_SYMM, None, sym)
+        if not ret:
+            self.logger.debug('User canceled. Bailing out')
+            return
+
+        tuple = idaapi.get_named_type(sym.til, sym.name, 0)
+
+        if tuple == None:
+            self.logger.debug('Could not find %s', sym.name)
+            return
+
+        tinfo = idaapi.tinfo_t()
+        tinfo.deserialize(sym.til, tuple[1], tuple[2])
+
+        return tinfo
+
+    def getBuiltinGlobalTypeCtypes(self):
+        self.logger.debug('Getting GlobalType the Ctypes way')
+
+        ############################################################
+        # Several type-related functions aren't accessibly via IDAPython
+        # so have to do things with ctypes
+        idaname = "ida64" if idc.__EA64__ else "ida"
+        if sys.platform == "win32":
+            g_dll = ctypes.windll[idaname + ".wll"]
+        elif sys.platform == "linux2":
+            g_dll = ctypes.cdll["lib" + idaname + ".so"]
+        elif sys.platform == "darwin":
+            g_dll = ctypes.cdll["lib" + idaname + ".dylib"]
+
+        ############################################################
+        # Specifying function types for a few IDA SDK functions to keep the 
+        # pointer-to-pointer args clear.
+        get_named_type = g_dll.get_named_type
+        get_named_type.argtypes = [
+            ctypes.c_void_p,                                #const til_t *ti,
+            ctypes.c_char_p,                                #const char *name,
+            ctypes.c_int,                                   #int ntf_flags,
+            ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const type_t **type=NULL,
+            ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const p_list **fields=NULL,
+            ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const char **cmt=NULL,
+            ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const p_list **fieldcmts=NULL,
+            ctypes.POINTER(ctypes.c_ulong),                 #sclass_t *sclass=NULL,
+            ctypes.POINTER(ctypes.c_ulong),                 #uint32 *value=NULL);
+        ]
+
         sym = idaapi.til_symbol_t()
         #dang - no predicate func support via idapython :(
         #idaapi.choose_named_type2(idaapi.cvar.idati, 'Choose type to apply', idaapi.NTF_SYMM, predFunc, sym)
@@ -181,8 +213,14 @@ class ApplyCalleeTypeRunner(object):
         return tinfo
 
 
+    def convertUserType(self, stin):
+        #get rid of param type macros ida can't parse
+        for sub in MSDN_MACROS:
+            stin = stin.replace(sub, '')
+        return stin
 
     def run(self):
+        self.logger.info('Starting up')
         try:
             here = idc.here()
             self.logger.info('Using ea: 0x%08x', here)
@@ -208,7 +246,8 @@ class ApplyCalleeTypeRunner(object):
             tinfo = None
             #check user input type
             if dlg.inputType == dlg.USER_TYPE:
-                tinfo = self.getUserDeclType(str(dlg.getUserText()))
+                decl = self.convertUserType(str(dlg.getUserText()))
+                tinfo = self.getUserDeclType(decl)
             elif dlg.inputType == dlg.STANDARD_TYPE:
                 tinfo = self.getBuiltinGlobalType()
             elif dlg.inputType == dlg.LOCAL_TYPE:
@@ -273,8 +312,8 @@ class ApplyCalleeTypeWidget(QtGui.QDialog):
 
 
 def main():
-    #logger = jayutils.configLogger('', logging.DEBUG)
-    logger = jayutils.configLogger('', logging.INFO)
+    logger = jayutils.configLogger('', logging.DEBUG)
+    #logger = jayutils.configLogger('', logging.INFO)
     launcher = ApplyCalleeTypeRunner()
     launcher.run()
 

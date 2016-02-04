@@ -23,7 +23,8 @@ The struct_typer_plugin.py plugin implements the struct typing described here: h
 The stackstrings_plugin.py implements the recovery of manually constructed strings described here: http://www.fireeye.com/blog/technical/malware-research/2014/08/flare-ida-pro-script-series-automatic-recovery-of-constructed-strings-in-malware.html
 
 ### MSDN Annotations ###
-This script for IDA Pro adds MSDN information from a XML file to the database.
+This script for IDA Pro adds MSDN information from a XML file to the database. Information about this plugin can be found at: https://www.fireeye.com/blog/threat-research/2014/09/flare-ida-pro-script-series-msdn-annotations-ida-pro-for-malware-analysis.html
+
 The following functionality is included:
 
   - Backup the original database
@@ -46,3 +47,21 @@ you click OK.
 After executing the script once, *View - Recent scripts* (ALT + F9) can be used
 as well.
 
+### ApplyCalleeType ###
+This plugin allows you to specify or choose a function type for indirect calls as described here: https://www.fireeye.com/blog/threat-research/2015/04/flare_ida_pro_script.html
+
+
+### idb2pat ###
+This script allows you to easily generate function patterns from an existing IDB database that can then be turned into FLIRT signatures to help identify similar functions in new files. More information is available at:
+https://www.fireeye.com/blog/threat-research/2015/01/flare_ida_pro_script.html
+
+
+### argtracker ###
+This utility can help you identify static arguments to functions used within a program. This is most commonly used to extract arguments to string decoder functions. Example usage is available in 
+
+* examples/argtracker_example1.py
+* examples/argtracker_example2.py
+
+A blog post with further information is available at:
+
+https://www.fireeye.com/blog/threat-research/2015/11/flare_ida_pro_script.html

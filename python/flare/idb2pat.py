@@ -154,10 +154,9 @@ def find_ref_loc(config, ea, ref):
         logger.debug("Bad parameter: ref")
         return BADADDR
 
-
-    # TODO: handle self-relative references
-    # https://github.com/nihilus/idb2pat/blob/master/idb2pat.cpp#L156
-
+    if GetOpType(ea, 0) == o_near:
+        ref = (ref - get_item_end(ea)) & ((1<<config.pointer_size*8)-1)
+    
     if isCode(getFlags(ea)):
         for i in zrange(ea, get_item_end(ea) - config.pointer_size):
             if get_long(i) == ref:
@@ -261,10 +260,11 @@ def make_func_sig(config, func):
     for i in zrange(32, min(func.endEA - func.startEA, 255 + 32)):
         if i in variable_bytes:
             break
-        crc_data[i - 32] = get_byte(func.startEA + i)
+
+        crc_data[loc - 32] = get_byte(func.startEA + loc)
 
     # TODO: is this required everywhere? ie. with variable bytes?
-    alen = i - 32 + 1  # plus 1 to offset the for-loop break
+    alen = loc - 32
 
     crc = crc16(to_bytestring(crc_data[:alen]), crc=0xFFFF)
     sig += " %02X" % (alen)
@@ -296,6 +296,16 @@ def make_func_sig(config, func):
             addrs = func.startEA - ref_loc
             ref_format = " ^-%%0%dX %%s" % (config.pointer_size)
         sig += ref_format % (addr, name)
+        
+    # Tail of the module starts at the end of the CRC16 block.
+    if loc > 32 and loc < func.endEA:
+        tail = " "
+        for ea in xrange(func.startEA + loc, min(func.endEA, func.startEA + 0x8000)):
+            if ea in variable_bytes:
+                tail += ".."
+            else:
+                tail += "%02X" % (get_byte(ea))
+        sig += tail
 
     logger.debug("sig: %s", sig)
     return sig
@@ -324,7 +334,7 @@ def make_func_sigs(config):
 
     elif config.mode == NON_AUTO_FUNCTIONS:
         for f in get_functions():
-            if has_name(getFlags(f.startEA)) and func.flags & FUNC_LIB == 0:
+            if has_name(getFlags(f.startEA)) and f.flags & FUNC_LIB == 0:
                 try:
                     sigs.append(make_func_sig(config, f))
                 except FuncTooShortException:
@@ -336,7 +346,7 @@ def make_func_sigs(config):
 
     elif config.mode == LIBRARY_FUNCTIONS:
         for f in get_functions():
-            if has_name(getFlags(f.startEA)) and func.flags & FUNC_LIB != 0:
+            if has_name(getFlags(f.startEA)) and f.flags & FUNC_LIB != 0:
                 try:
                     sigs.append(make_func_sig(config, f))
                 except FuncTooShortException:
@@ -375,7 +385,7 @@ def make_func_sigs(config):
         n = get_func_qty()
         for i, f in enumerate(get_functions()):
             try:
-                logger.info("[ %d / %d ] %s %s", i, n, get_name(0, f.startEA), hex(f.startEA))
+                logger.info("[ %d / %d ] %s %s", i + 1, n, get_name(0, f.startEA), hex(f.startEA))
                 sigs.append(make_func_sig(config, f))
             except FuncTooShortException:
                 pass
@@ -426,7 +436,6 @@ def update_config(config):
 def main():
     c = Config()
     update_config(c)
-
     if c.logenabled:
         h = logging.FileHandler(c.logfile)
         h.setLevel(c.loglevel)
@@ -453,7 +462,6 @@ def main():
                 f.write("\r\n")
             f.write("---")
             f.write("\r\n")
-
 
 if __name__ == "__main__":
     main()
