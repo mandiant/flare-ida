@@ -255,6 +255,7 @@ def make_func_sig(config, func):
 
     sig += ".." * (32 - (len(sig) / 2))
 
+    loc = 32
     crc_data = [0 for i in zrange(256)]
     # for 255 bytes starting at index 32, or til end of function, or variable byte
     for i in zrange(32, min(func.endEA - func.startEA, 255 + 32)):
