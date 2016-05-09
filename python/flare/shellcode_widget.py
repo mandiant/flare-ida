@@ -28,18 +28,18 @@ import logging
 import traceback
 
 
-from PySide import QtGui
-from PySide import QtCore 
-from PySide.QtCore import Qt
+from PyQt5 import QtWidgets
+from PyQt5 import QtCore 
+from PyQt5.QtCore import Qt
 
 # Import the compiled UI module
 from shellcodechooser import Ui_ShellcodeChooser
 
 import jayutils
 
-class ShellcodeWidget(QtGui.QDialog):
+class ShellcodeWidget(QtWidgets.QDialog):
     def __init__(self, dbstore, params, parent=None):
-        QtGui.QDialog.__init__(self, parent)
+        QtWidgets.QDialog.__init__(self, parent)
         try:
             self.logger = jayutils.getLogger('ShellcodeWidget')
             self.logger.debug('Hello debug')
@@ -48,7 +48,7 @@ class ShellcodeWidget(QtGui.QDialog):
             self.configData = {}
             self.ui=Ui_ShellcodeChooser()
             self.ui.setupUi(self)
-            self.ui.list_hashNames.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+            self.ui.list_hashNames.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
             self.ui.list_hashNames.currentTextChanged.connect(self.handleTextChange)
             self.ui.buttonBox.accepted.connect(self.storeStateAccepted)
             self.ui.buttonBox.rejected.connect(self.reject)
@@ -59,7 +59,7 @@ class ShellcodeWidget(QtGui.QDialog):
         except Exception, err:
             self.logger.exception('Error during init: %s', str(err))
     
-    custom_accepted = QtCore.Signal()
+    custom_accepted = QtCore.pyqtSignal()
 
     def storeStateAccepted(self):
         self.logger.debug('Storing state on accepted signal')
@@ -91,12 +91,12 @@ class ShellcodeWidget(QtGui.QDialog):
             if self.configData.has_key(hash.hashName):
                 raise RuntimeError('Duplicate name not allowed')
             self.configData[hash.hashName] = hash.hashCode
-            item = QtGui.QListWidgetItem(hash.hashName)
+            item = QtWidgets.QListWidgetItem(hash.hashName)
             self.ui.list_hashNames.addItem(item)
 
         self.ui.list_hashNames.setCurrentRow(0)
-        self.ui.cb_dwordArray.setCheckState(QtCore.Qt.CheckState.Checked)
-        self.ui.cb_createStruct.setCheckState(QtCore.Qt.CheckState.Checked)
-        self.ui.cb_instrOps.setCheckState(QtCore.Qt.CheckState.Checked)
+        self.ui.cb_dwordArray.setCheckState(QtCore.Qt.Checked)
+        self.ui.cb_createStruct.setCheckState(QtCore.Qt.Checked)
+        self.ui.cb_instrOps.setCheckState(QtCore.Qt.Checked)
         return
 

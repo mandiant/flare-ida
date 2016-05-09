@@ -29,9 +29,9 @@ import sys
 import ctypes
 import logging
 
-from PySide import QtGui
-from PySide import QtCore 
-from PySide.QtCore import Qt
+from PyQt5 import QtWidgets
+from PyQt5 import QtCore 
+from PyQt5.QtCore import Qt
 
 import idc
 import idaapi
@@ -140,9 +140,9 @@ def loadStructs():
 ############################################################
 g_DefaultPrefixRegexp = r'field_.*_'
 
-class StructTyperWidget(QtGui.QDialog):
+class StructTyperWidget(QtWidgets.QDialog):
     def __init__(self, parent=None):
-        QtGui.QDialog.__init__(self, parent)
+        QtWidgets.QDialog.__init__(self, parent)
         try:
             self.logger = jayutils.getLogger('StructTyperWidget')
             self.logger.debug('StructTyperWidget starting up')
@@ -158,7 +158,7 @@ class StructTyperWidget(QtGui.QDialog):
 
     def setStructs(self, structs):
         for name in structs:
-            item = QtGui.QListWidgetItem(name)
+            item = QtWidgets.QListWidgetItem(name)
             self.ui.listWidget.addItem(item)
 
     def getRegPrefix(self):
@@ -180,7 +180,7 @@ class StructTypeRunner(object):
             oldTo = idaapi.set_script_timeout(0)
             res = dlg.exec_()
             idaapi.set_script_timeout(oldTo)
-            if res == QtGui.QDialog.DialogCode.Accepted:
+            if res == QtWidgets.QDialog.Accepted:
                 regPrefix = dlg.getRegPrefix()
                 sid = None
                 struc = None
@@ -217,7 +217,7 @@ class StructTypeRunner(object):
                     funcend = idc.GetFunctionAttr(idc.here(), idc.FUNCATTR_END)
                     if (funcstart != idc.BADADDR) and (funcend != idc.BADADDR):
                         idc.AnalyzeArea(funcstart, funcend)
-            elif res == QtGui.QDialog.DialogCode.Rejected:
+            elif res == QtWidgets.QDialog.Rejected:
                 self.logger.info('Dialog result: canceled by user')
             else:
                 self.logger.debug('Unknown result')

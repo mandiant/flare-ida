@@ -23,9 +23,9 @@ import logging
 import traceback
 import ConfigParser
 from ConfigParser import SafeConfigParser
-from PySide import QtGui
-from PySide import QtCore
-from PySide.QtCore import Qt
+from PyQt5 import QtWidgets
+from PyQt5 import QtCore
+from PyQt5.QtCore import Qt
 
 idaapi.require("IDB_MSDN_Annotator")
 
@@ -38,7 +38,7 @@ g_logger = logging.getLogger(__name__)
 def getDefaultMsdnDataDir():
     return os.path.abspath(os.path.join(idaapi.get_user_idadir(), 'MSDN_data'))
 
-class MSDNAnnotationDialog(QtGui.QDialog):
+class MSDNAnnotationDialog(QtWidgets.QDialog):
 
     def read_config(self):
         config = {}
@@ -87,10 +87,10 @@ class MSDNAnnotationDialog(QtGui.QDialog):
                                           int(self.chkConstantsImport
                                               .isChecked()))
         img_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'IDB_MSDN_Annotator', 'img'))
-        self.pic.setPixmap(QtGui.QPixmap(os.path.join(img_path, image)))
+        self.pic.setPixmap(QtWidgets.QPixmap(os.path.join(img_path, image)))
 
     def on_select_dir(self):
-        msdnDir = QtGui.QFileDialog.getExistingDirectory(caption='Select directory containing MSDN XML Database')
+        msdnDir = QtWidgets.QFileDialog.getExistingDirectory(caption='Select directory containing MSDN XML Database')
         if len(msdnDir) != 0:
             self.dirText.setText(msdnDir)
 
@@ -105,11 +105,11 @@ class MSDNAnnotationDialog(QtGui.QDialog):
         msdnpath = os.path.join(self.dirText.text(), IDB_MSDN_Annotator.MSDN_INFO_FILE)
         if not os.path.exists(msdnpath):
             g_logger.info('Error - no msdn info file: %s', msdnpath)
-            ret = QtGui.QMessageBox.warning(self, 'MSDN Info Not Found', 'The file %s was not found in the specified MSDN Data Directory' % IDB_MSDN_Annotator.MSDN_INFO_FILE, QtGui.QMessageBox.Ok)
-            #self.done(QtGui.QDialog.Rejected)
+            ret = QtWidgets.QMessageBox.warning(self, 'MSDN Info Not Found', 'The file %s was not found in the specified MSDN Data Directory' % IDB_MSDN_Annotator.MSDN_INFO_FILE, QtWidgets.QMessageBox.Ok)
+            #self.done(QtWidgets.QDialog.Rejected)
             return
 
-        self.done(QtGui.QDialog.Accepted)
+        self.done(QtWidgets.QDialog.Accepted)
         g_logger.info('Saving config')
         self.save_config()
         config = self.read_config()
@@ -133,40 +133,40 @@ class MSDNAnnotationDialog(QtGui.QDialog):
         self.dirText.setText(self.config['msdn_data_dir'])
 
     def populate_form(self):
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
 
         # Functions
-        layout1 = QtGui.QVBoxLayout()
-        groupBox = QtGui.QGroupBox('Markup Options')
-        self.chkFunctionsAnnotate = QtGui.QCheckBox("Annotate function names"
+        layout1 = QtWidgets.QVBoxLayout()
+        groupBox = QtWidgets.QGroupBox('Markup Options')
+        self.chkFunctionsAnnotate = QtWidgets.QCheckBox("Annotate function names"
                                                     " (see note)")
         layout1.addWidget(self.chkFunctionsAnnotate)
-        self.chkFuntcsRepeatable = QtGui.QCheckBox("Use repeatable comments "
+        self.chkFuntcsRepeatable = QtWidgets.QCheckBox("Use repeatable comments "
                                                    "for function name "
                                                    "annotations")
         layout1.addWidget(self.chkFuntcsRepeatable)
 
         # Arguments
-        self.chkArgumentsAnnotate = QtGui.QCheckBox("Annotate function "
+        self.chkArgumentsAnnotate = QtWidgets.QCheckBox("Annotate function "
                                                     "arguments (see note)")
         layout1.addWidget(self.chkArgumentsAnnotate)
 
         # Constants
-        self.chkConstantsImport = QtGui.QCheckBox("Rename constants")
+        self.chkConstantsImport = QtWidgets.QCheckBox("Rename constants")
         layout1.addWidget(self.chkConstantsImport)
 
         groupBox.setLayout(layout1)
         layout.addWidget(groupBox)
 
         #MSDN data dir
-        hlayout = QtGui.QHBoxLayout()
-        self.selectDirButton = QtGui.QPushButton('...')
+        hlayout = QtWidgets.QHBoxLayout()
+        self.selectDirButton = QtWidgets.QPushButton('...')
         self.selectDirButton.clicked.connect(self.on_select_dir)
         hlayout.addWidget(self.selectDirButton)
-        self.dirText = QtGui.QLineEdit()
+        self.dirText = QtWidgets.QLineEdit()
         self.dirText.setReadOnly(True)
         hlayout.addWidget(self.dirText)
-        groupBox = QtGui.QGroupBox('MSDN Data Directory')
+        groupBox = QtWidgets.QGroupBox('MSDN Data Directory')
         groupBox.setLayout(hlayout)
         layout.addWidget(groupBox)
 
@@ -181,32 +181,32 @@ class MSDNAnnotationDialog(QtGui.QDialog):
         info_string = "Note: Annotating functions and/or arguments allows " \
                       "you to hover\nthe respective element in order to " \
                       "show its description."
-        layout.addWidget(QtGui.QLabel(info_string))
+        layout.addWidget(QtWidgets.QLabel(info_string))
 
         # Buttons
-        button_ok = QtGui.QPushButton('&OK')
+        button_ok = QtWidgets.QPushButton('&OK')
         button_ok.setDefault(True)
         button_ok.clicked.connect(self.on_ok_button)
         #button_ok.clicked.connect(self.close)
         layout.addWidget(button_ok)
-        button_cancel = QtGui.QPushButton('&Cancel')
+        button_cancel = QtWidgets.QPushButton('&Cancel')
         button_cancel.clicked.connect(self.close)
         layout.addWidget(button_cancel)
 
         # Image
-        self.pic = QtGui.QLabel()
+        self.pic = QtWidgets.QLabel()
         self.pic.setGeometry(0, 0, 663, 203)
         self.change_image()
 
         # Layout right
-        layout_r = QtGui.QVBoxLayout()
-        #layout_r.addWidget(QtGui.QLabel("Annotation preview"))
+        layout_r = QtWidgets.QVBoxLayout()
+        #layout_r.addWidget(QtWidgets.QLabel("Annotation preview"))
         layout_r.addWidget(self.pic)
-        groupBox = QtGui.QGroupBox('Annotation preview')
+        groupBox = QtWidgets.QGroupBox('Annotation preview')
         groupBox.setLayout(layout_r)
 
         # Setup layouts
-        h_layout = QtGui.QHBoxLayout()
+        h_layout = QtWidgets.QHBoxLayout()
         h_layout.addLayout(layout)
         #h_layout.addLayout(layout_r)
         h_layout.addWidget(groupBox)
@@ -216,7 +216,7 @@ class MSDNAnnotationDialog(QtGui.QDialog):
         self._logger = logging.getLogger(__name__ + '.' +
                                          self.__class__.__name__)
         self._logger.debug('Starting UI')
-        QtGui.QDialog.__init__(self, parent, QtCore.Qt.WindowSystemMenuHint |
+        QtWidgets.QDialog.__init__(self, parent, QtCore.Qt.WindowSystemMenuHint |
                                QtCore.Qt.WindowTitleHint)
         self.setWindowTitle("MSDN Annotations Configuration")
 
