@@ -149,12 +149,12 @@ class StructTyperWidget(QtWidgets.QDialog):
             self.ui=Ui_Dialog()
             self.ui.setupUi(self)
             self.ui.lineEdit.setText(g_DefaultPrefixRegexp)
-            self.ui.checkBox.setChecked(Qt.CheckState.Unchecked)
+            self.ui.checkBox.setChecked(Qt.Unchecked)
         except Exception, err:
             self.logger.exception('Error during init: %s', str(err))
 
     def getActiveStruct(self):
-        return str(self.ui.listWidget.currentItem().data(Qt.ItemDataRole.DisplayRole))
+        return str(self.ui.listWidget.currentItem().data(Qt.DisplayRole))
 
     def setStructs(self, structs):
         for name in structs:
