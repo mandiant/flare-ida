@@ -31,9 +31,9 @@ import sys
 import ctypes
 import logging
 
-from PySide import QtGui
-from PySide import QtCore 
-from PySide.QtCore import Qt
+from PyQt5 import QtWidgets
+from PyQt5 import QtCore 
+from PyQt5.QtCore import Qt
 
 import idc
 import idaapi
@@ -237,7 +237,7 @@ class ApplyCalleeTypeRunner(object):
             res = dlg.exec_()
             idaapi.set_script_timeout(oldTo)
 
-            if res == QtGui.QDialog.DialogCode.Accepted:
+            if res == QtWidgets.QDialog.Accepted:
                 self.logger.debug('Dialog accepted. Input type: %d', dlg.inputType)
             else:
                 self.logger.debug('Dialog rejected')
@@ -276,14 +276,14 @@ class ApplyCalleeTypeRunner(object):
         except Exception, err:
             self.logger.exception("Exception caught: %s", str(err))
 
-class ApplyCalleeTypeWidget(QtGui.QDialog):
+class ApplyCalleeTypeWidget(QtWidgets.QDialog):
     UNKNOWN_TYPE    = 0
     USER_TYPE       = 1
     STANDARD_TYPE   = 2
     LOCAL_TYPE      = 3
 
     def __init__(self, parent=None):
-        QtGui.QDialog.__init__(self, parent)
+        QtWidgets.QDialog.__init__(self, parent)
         try:
             self.logger = jayutils.getLogger('ApplyCalleeTypeWidget')
             self.tinfo = None

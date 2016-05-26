@@ -1,67 +1,61 @@
 # -*- coding: utf-8 -*-
-
-# Form implementation generated from reading ui file 'struct_typer_widget.ui'
-#
-# Created: Wed Aug 13 10:16:29 2014
-#      by: pyside-uic 0.2.15 running on PySide 1.2.1
-#
-# WARNING! All changes made in this file will be lost!
-
-from PySide import QtCore, QtGui
+from PyQt5 import QtCore, QtWidgets
 
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
         Dialog.resize(502, 364)
-        self.verticalLayout_2 = QtGui.QVBoxLayout(Dialog)
+        self.verticalLayout_2 = QtWidgets.QVBoxLayout(Dialog)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
-        self.verticalLayout = QtGui.QVBoxLayout()
+        self.verticalLayout = QtWidgets.QVBoxLayout()
         self.verticalLayout.setObjectName("verticalLayout")
-        self.rb_useStackFrame = QtGui.QRadioButton(Dialog)
+        self.rb_useStackFrame = QtWidgets.QRadioButton(Dialog)
         self.rb_useStackFrame.setObjectName("rb_useStackFrame")
-        self.buttonGroup = QtGui.QButtonGroup(Dialog)
+        self.buttonGroup = QtWidgets.QButtonGroup(Dialog)
         self.buttonGroup.setObjectName("buttonGroup")
         self.buttonGroup.addButton(self.rb_useStackFrame)
         self.verticalLayout.addWidget(self.rb_useStackFrame)
-        self.rb_useStruct = QtGui.QRadioButton(Dialog)
+        self.rb_useStruct = QtWidgets.QRadioButton(Dialog)
         self.rb_useStruct.setChecked(True)
         self.rb_useStruct.setObjectName("rb_useStruct")
         self.buttonGroup.addButton(self.rb_useStruct)
         self.verticalLayout.addWidget(self.rb_useStruct)
-        self.listWidget = QtGui.QListWidget(Dialog)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.MinimumExpanding, QtGui.QSizePolicy.Expanding)
+        self.listWidget = QtWidgets.QListWidget(Dialog)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.listWidget.sizePolicy().hasHeightForWidth())
         self.listWidget.setSizePolicy(sizePolicy)
         self.listWidget.setObjectName("listWidget")
         self.verticalLayout.addWidget(self.listWidget)
-        self.horizontalLayout = QtGui.QHBoxLayout()
+        self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
-        self.checkBox = QtGui.QCheckBox(Dialog)
+        self.checkBox = QtWidgets.QCheckBox(Dialog)
         self.checkBox.setObjectName("checkBox")
         self.horizontalLayout.addWidget(self.checkBox)
-        spacerItem = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Minimum)
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem)
-        self.lineEdit = QtGui.QLineEdit(Dialog)
+        self.lineEdit = QtWidgets.QLineEdit(Dialog)
         self.lineEdit.setObjectName("lineEdit")
         self.horizontalLayout.addWidget(self.lineEdit)
         self.verticalLayout.addLayout(self.horizontalLayout)
         self.verticalLayout_2.addLayout(self.verticalLayout)
-        self.buttonBox = QtGui.QDialogButtonBox(Dialog)
+        self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Cancel|QtGui.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout_2.addWidget(self.buttonBox)
 
         self.retranslateUi(Dialog)
-        QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL("accepted()"), Dialog.accept)
-        QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL("rejected()"), Dialog.reject)
+
+        self.buttonBox.accepted.connect(Dialog.accept)
+        self.buttonBox.rejected.connect(Dialog.reject)
+
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
     def retranslateUi(self, Dialog):
-        Dialog.setWindowTitle(QtGui.QApplication.translate("Dialog", "StructTyper", None, QtGui.QApplication.UnicodeUTF8))
-        self.rb_useStackFrame.setText(QtGui.QApplication.translate("Dialog", "Current Stack Frame", None, QtGui.QApplication.UnicodeUTF8))
-        self.rb_useStruct.setText(QtGui.QApplication.translate("Dialog", "Structure", None, QtGui.QApplication.UnicodeUTF8))
-        self.checkBox.setText(QtGui.QApplication.translate("Dialog", "Prefix RegEx", None, QtGui.QApplication.UnicodeUTF8))
+        Dialog.setWindowTitle(QtWidgets.QApplication.translate("Dialog", "StructTyper", None))
+        self.rb_useStackFrame.setText(QtWidgets.QApplication.translate("Dialog", "Current Stack Frame", None))
+        self.rb_useStruct.setText(QtWidgets.QApplication.translate("Dialog", "Structure", None))
+        self.checkBox.setText(QtWidgets.QApplication.translate("Dialog", "Prefix RegEx", None))
 

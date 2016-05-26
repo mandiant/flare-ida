@@ -37,10 +37,10 @@ import jayutils
 
 QT_AVAILABLE = True
 try:
-    from PySide import QtGui, QtCore
+    from PyQt5 import QtWidgets, QtCore
     from shellcode_widget import ShellcodeWidget
 except ImportError:
-    print 'Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PySide build available at \n"http://hex-rays.com/products/ida/support/download.shtml"'
+    print 'Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PyQt5 build available at \n"http://hex-rays.com/products/ida/support/download.shtml"'
     QT_AVAILABLE = False
 
 class RejectionException(Exception):
@@ -359,9 +359,9 @@ class SearchLauncher(object):
         res = dlg.exec_()
         #restore the timeout
         idaapi.set_script_timeout(oldTo)
-        if res == QtGui.QDialog.DialogCode.Accepted:
+        if res == QtWidgets.QDialog.Accepted:
             self.logger.debug('Dialog result: accepted')
-        elif res == QtGui.QDialog.DialogCode.Rejected:
+        elif res == QtWidgets.QDialog.Rejected:
             self.logger.debug('Dialog result: rejected')
             raise RejectionException()
         else:
