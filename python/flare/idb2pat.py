@@ -33,6 +33,8 @@ def zrange(*args):
         end = args[1]
     else:
         raise RuntimeError("Invalid arguments provided to zrange: {:s}".format(str(args)))
+    if end < start:
+        raise RuntimeError("zrange only iterates from smaller to bigger numbers only: {:d}, {:d}".format(start, end))
     return iter(itertools.count(start).next, end)
 
 
