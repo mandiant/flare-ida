@@ -577,7 +577,7 @@ for c in input_string {
 return (acc_1 << 0x10) | acc2
 '''
 
-def hash_lib_19a45(inString,fName):
+def hash_Carbanak(inString,fName):
     a2 = map(ord, inString)
     ctr = 0
     for i in a2:
@@ -587,8 +587,14 @@ def hash_lib_19a45(inString,fName):
 
     return ctr
 
-pseudocode_hash_lib_19a45 = '''
-blah
+pseudocode_hash_Carbanak = '''
+    acc_1 = 0
+    for c in input_string:
+        acc_1 = (acc_1 << 4) + c
+        if (acc_1 & 0xF0000000):
+            acc_1 = (((acc_1 & 0xF0000000) >> 24) ^ acc_1) & 0x0FFFFFFF
+
+    return acc_1
 '''
 
 # The list of tuples of (supported hash name, hash size, pseudo_code)
@@ -612,8 +618,8 @@ HASH_TYPES = [
     ('add1505Shl5Hash32',       32, pseudocode_add1505Shl5Hash32),
     ('rol7XorHash32',           32, pseudocode_rol7XorHash32),
     ('rol7AddXor2Hash32',       32, pseudocode_rol7AddXor2Hash32),
-    ('dualaccModFFF1Hash',       32, pseudocode_dualaccModFFF1Hash),
-    ('hash_lib_19a45',       32, pseudocode_hash_lib_19a45),
+    ('dualaccModFFF1Hash',      32, pseudocode_dualaccModFFF1Hash),
+    ('hash_Carbanak',           32, pseudocode_hash_Carbanak),
 ]
 
 
