@@ -577,8 +577,19 @@ for c in input_string {
 return (acc_1 << 0x10) | acc2
 '''
 
+def hash_lib_19a45(inString,fName):
+    a2 = map(ord, inString)
+    ctr = 0
+    for i in a2:
+        ctr = (ctr << 4) + i
+        if (ctr & 0xF0000000):
+            ctr = (((ctr & 0xF0000000) >> 24) ^ ctr) & 0x0FFFFFFF
 
+    return ctr
 
+pseudocode_hash_lib_19a45 = '''
+blah
+'''
 
 # The list of tuples of (supported hash name, hash size, pseudo_code)
 HASH_TYPES = [
@@ -602,6 +613,7 @@ HASH_TYPES = [
     ('rol7XorHash32',           32, pseudocode_rol7XorHash32),
     ('rol7AddXor2Hash32',       32, pseudocode_rol7AddXor2Hash32),
     ('dualaccModFFF1Hash',       32, pseudocode_dualaccModFFF1Hash),
+    ('hash_lib_19a45',       32, pseudocode_hash_lib_19a45),
 ]
 
 
