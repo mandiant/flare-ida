@@ -24,6 +24,7 @@ import traceback
 import ConfigParser
 from ConfigParser import SafeConfigParser
 from PyQt5 import QtWidgets
+from PyQt5 import QtGui
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
 
@@ -87,7 +88,7 @@ class MSDNAnnotationDialog(QtWidgets.QDialog):
                                           int(self.chkConstantsImport
                                               .isChecked()))
         img_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'IDB_MSDN_Annotator', 'img'))
-        self.pic.setPixmap(QtWidgets.QPixmap(os.path.join(img_path, image)))
+        self.pic.setPixmap(QtGui.QPixmap(os.path.join(img_path, image)))
 
     def on_select_dir(self):
         msdnDir = QtWidgets.QFileDialog.getExistingDirectory(caption='Select directory containing MSDN XML Database')

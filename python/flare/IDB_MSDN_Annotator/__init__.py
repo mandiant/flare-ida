@@ -29,8 +29,6 @@ import idautils
 import idaapi
 import xml_parser
 
-from PySide import QtGui
-
 CREATE_BACKUP = True # indicate if a backup should be created
 # The file should be located in the the MSDN_data directory
 MSDN_INFO_FILE = 'msdn_data.xml'
