@@ -301,6 +301,21 @@ for c in input_string {
 }
 '''
 
+def addRor4WithNullHash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString + "\x00":
+        val = (val & 0xffffff00) + ((val + ord(i)) & 0xff)
+        val = ror(val, 0x4, 32)
+    return val
+
+pseudocode_addRor4WithNullHash32 = '''acc := 0;
+for c in input_string_with_trailing_NULL {
+   acc := (acc & 0xffffff00) + ((acc + c) & 0xff);
+   acc := ROR(acc, 4):
+}
+'''
 
 
 def ror7AddHash32(inString,fName):
@@ -605,6 +620,7 @@ HASH_TYPES = [
     ('poisonIvyHash',           32, pseudocode_poisonIvyHash),
     ('rol7AddHash32',           32, pseudocode_rol7AddHash32),
     ('rol5AddHash32',           32, pseudocode_rol5AddHash32),
+    ('addRor4WithNullHash32',   32, pseudocode_addRor4WithNullHash32),
     ('rol3XorEax',              32, pseudocode_rol3XorEax),
     ('ror7AddHash32',           32, pseudocode_ror7AddHash32),
     ('ror9AddHash32',           32, pseudocode_ror9AddHash32),
