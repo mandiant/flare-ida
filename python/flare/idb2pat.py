@@ -4,7 +4,7 @@ import binascii
 import itertools
 from collections import namedtuple
 
-from idc import *
+import idc
 from idaapi import *
 
 # TODO: make this into an enum
@@ -56,7 +56,7 @@ class Config(object):
         self.min_func_length = min_func_length
         # TODO: get pointer_size from IDA
         self.pointer_size = pointer_size
-        if __EA64__:
+        if idc.__EA64__:
             self.pointer_size = 8
         self.mode = mode
         self.pat_append = pat_append
@@ -156,11 +156,11 @@ def find_ref_loc(config, ea, ref):
         logger.debug("Bad parameter: ref")
         return BADADDR
 
-    if GetOpType(ea, 0) == o_near:
+    if idc.GetOpType(ea, 0) == o_near:
         ref = (ref - get_item_end(ea)) & ((1<<config.pointer_size*8)-1)
     
     if isCode(getFlags(ea)):
-        for i in zrange(ea, get_item_end(ea) - config.pointer_size):
+        for i in zrange(ea, max(ea, get_item_end(ea) - config.pointer_size)):
             if get_long(i) == ref:
                 return i
 
