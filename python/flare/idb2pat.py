@@ -160,7 +160,7 @@ def find_ref_loc(config, ea, ref):
         ref = (ref - get_item_end(ea)) & ((1<<config.pointer_size*8)-1)
     
     if isCode(getFlags(ea)):
-        for i in zrange(ea, get_item_end(ea) - config.pointer_size):
+        for i in zrange(ea, max(ea, get_item_end(ea) - config.pointer_size)):
             if get_long(i) == ref:
                 return i
 
