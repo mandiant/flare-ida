@@ -65,3 +65,6 @@ This utility can help you identify static arguments to functions used within a p
 A blog post with further information is available at:
 
 https://www.fireeye.com/blog/threat-research/2015/11/flare_ida_pro_script.html
+
+### objc2_xrefs_helper ###
+This script creates cross-references between selector references and their implementations as defined in the Objective-C 2.0 runtime related sections of the target Mach-O executable. This makes analysis of Objective-C code easier by enabling smooth transitions between an implementation and the locations where its selector is referenced throughout the code.
