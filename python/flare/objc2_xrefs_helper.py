@@ -23,24 +23,9 @@ from idc import *
 from idaapi import *
 from idautils import *
 
-size_DWORD = 4
-size_pointer = 8
-
-objcData = None
-objcSelRefs = None
-objcMsgRefs = None
-objcConst = None
-objc2ClassSize = 0x28
-objc2ClassInfoOffs = 0x20
-objc2ClassMethSize = 0x18
-objc2ClassBaseMethsOffs = 0x20
-objc2ClassMethImpOffs = 0x10
-
-
 # checks that methname has an xref to selrefs or the msgrefs section, returns ref pointer
 # checks if methname is used in more than one class, avoid dealing with these ambiguous cases
-def getRefPtr(classMethodsVA):
-    global objcSelRefs, objcMsgRefs, objcConst
+def getRefPtr(classMethodsVA, objcSelRefs, objcMsgRefs, objcConst):
     ret = (None, None)
     namePtr = Qword(classMethodsVA)
     cnt = 0
@@ -49,7 +34,7 @@ def getRefPtr(classMethodsVA):
             ret = (False, x.frm)
         elif objcMsgRefs and x.frm >= objcMsgRefs[0] and x.frm < objcMsgRefs[1]:
             ret = (True, x.frm)
-        elif x.frm >= objcConst[0] and x.frm < objcConst[1]:
+        elif objcConst and x.frm >= objcConst[0] and x.frm < objcConst[1]:
             cnt += 1    
         
     if cnt > 1:
@@ -58,6 +43,18 @@ def getRefPtr(classMethodsVA):
 
 
 def main():
+    size_DWORD = 4
+    size_pointer = 8
+    objcData = None
+    objcSelRefs = None
+    objcMsgRefs = None
+    objcConst = None
+    objc2ClassSize = 0x28
+    objc2ClassInfoOffs = 0x20
+    objc2ClassMethSize = 0x18
+    objc2ClassBaseMethsOffs = 0x20
+    objc2ClassMethImpOffs = 0x10
+    
     # iterate segments, grab the VAs we need
     for segVA in Segments():
         segName = SegName(segVA)
@@ -69,8 +66,8 @@ def main():
             objcMsgRefs = (segVA, SegEnd(segVA))
         elif segName == "__objc_const":
             objcConst = (segVA, SegEnd(segVA))
-      
-    if not ((objcSelRefs or objcMsgRefs) and objcData and objcConst):
+    
+    if ((objcSelRefs != None or objcMsgRefs != None) and (objcData != None and objcConst != None)) == False:
         Message("could not find necessary Objective-C sections..\n")
         return
         
@@ -90,7 +87,7 @@ def main():
         
         # walk methods
         for va2 in range(classMethodsVA, classMethodsVA + objc2ClassMethSize * count, objc2ClassMethSize):
-            isMsgRef, selRefVA = getRefPtr(va2)
+            isMsgRef, selRefVA = getRefPtr(va2, objcSelRefs, objcMsgRefs, objcConst)
             if selRefVA == None:
                 continue
             
