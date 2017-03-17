@@ -43,6 +43,12 @@ import jayutils
 
 from apply_callee_type_widget import Ui_ApplyCalleeDialog
 
+MSDN_MACROS = [
+' _In_ ',
+' _Out_ ',
+' _Inout_ ',
+]
+
 
 def predFunc(*args):
     print 'Running predFunc: %s' % str(args)
@@ -64,8 +70,10 @@ class ApplyCalleeTypeRunner(object):
 
     def getUserDeclType(self, decl):
         tinfo = idaapi.tinfo_t()
-        ret = idaapi.parse_decl2(idaapi.cvar.idati, decl, 'blah', tinfo, 0)
-        if not ret:
+        #self.logger.debug('Trying to parse declaration: %r', decl)
+        ret = idaapi.parse_decl2(idaapi.cvar.idati, decl, tinfo, idaapi.PT_TYP)
+        #self.logger.debug('Return from parse_decl2: %r', ret)
+        if ret is None:
             self.logger.info('parse_decl2 failed')
             return None
         return tinfo
