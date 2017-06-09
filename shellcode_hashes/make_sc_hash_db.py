@@ -612,6 +612,41 @@ pseudocode_hash_Carbanak = '''
     return acc_1
 '''
 
+def hash_ror13AddUpperDllnameHash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    dllHash = 0
+    for i in fName:
+        dllHash = ror(dllHash, 0xd, 32)
+        b = ord(i)
+        if b >= 0x61:
+            b -= 0x20
+        dllHash += b
+        dllHash = 0xffffffff & dllHash
+    for i in inString:
+        val = ror(val, 0xd, 32)
+        val += ord(i)
+        val = 0xffffffff & val
+    return 0xffffffff & (dllHash + val)
+
+
+
+pseudocode_hash_ror13AddUpperDllnameHash32 = '''
+acc := 0
+dllhash := 0
+for i in dllname {
+   dllhash := ROR(acc, 13);
+   dllhash := dllhash + toupper(c);
+}
+for i in input_string {
+   acc := ROR(acc, 13);
+   acc := acc + toupper(c);
+}
+return  acc + dllhash
+'''
+
+
 # The list of tuples of (supported hash name, hash size, pseudo_code)
 HASH_TYPES = [
     ('ror13AddHash32',          32, pseudocode_ror13AddHash32),
@@ -636,6 +671,7 @@ HASH_TYPES = [
     ('rol7AddXor2Hash32',       32, pseudocode_rol7AddXor2Hash32),
     ('dualaccModFFF1Hash',      32, pseudocode_dualaccModFFF1Hash),
     ('hash_Carbanak',           32, pseudocode_hash_Carbanak),
+    ('hash_ror13AddUpperDllnameHash32',32, pseudocode_hash_ror13AddUpperDllnameHash32),
 ]
 
 

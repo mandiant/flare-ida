@@ -332,10 +332,13 @@ class SearchLauncher(object):
     def run(self):
         try:
             self.logger.debug("Starting up")
-            dbFile = idc.AskFile(0, "*.db", "Select shellcode hash database")
-            if (dbFile is None) or (not os.path.isfile(dbFile)):
-                self.logger.debug("No file select. Stopping now")
-                return
+            dbFile = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'shellcode_hashes', 'sc_hashes.db'))
+            self.logger.debug('Trying default db path: %s', dbFile)
+            if not os.path.exists(dbFile):
+                dbFile = idc.AskFile(0, "*.db", "Select shellcode hash database")
+                if (dbFile is None) or (not os.path.isfile(dbFile)):
+                    self.logger.debug("No file select. Stopping now")
+                    return
             self.dbstore = DbStore(dbFile)
             self.logger.debug("Loaded db file: %s", dbFile)
             if QT_AVAILABLE:
