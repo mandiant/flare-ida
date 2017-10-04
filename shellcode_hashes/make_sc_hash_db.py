@@ -43,7 +43,7 @@ INTERESTING_DLLS = [
     'kernel32.dll', 'comctl32.dll', 'advapi32.dll', 'comdlg32.dll',
     'gdi32.dll',    'msvcrt.dll',   'netapi32.dll', 'ntdll.dll',
     'ntoskrnl.exe', 'oleaut32.dll', 'psapi.dll',    'shell32.dll',
-    'shlwapi.dll',  'srsvc.dll',    'urlmon.dll',   'user32.dll',
+    'shlwapi.dll',  'srvsvc.dll',   'urlmon.dll',   'user32.dll',
     'winhttp.dll',  'wininet.dll',  'ws2_32.dll',   'wship6.dll',
     'advpack.dll',
 ]
