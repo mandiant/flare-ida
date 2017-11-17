@@ -201,7 +201,7 @@ def make_func_sig(config, func):
     while ea != BADADDR and ea < func.endEA:
         logger.debug("ea: %s", hex(ea))
 
-        name = get_name(0, ea)
+        name = get_name(ea)
         if name is not None and name != "":
             logger.debug("has a name")
             publics.append(ea)
@@ -278,7 +278,7 @@ def make_func_sig(config, func):
     # this will be either " :%04d %s" or " :%08d %s"
     public_format = " :%%0%dX %%s" % (config.pointer_size)
     for public in publics:
-        name = get_name(0, public)
+        name = get_name(public)
         if name is None or name == "":
             continue
 
@@ -333,7 +333,7 @@ def make_func_sigs(config):
             logger.exception(e)
             # TODO: GetFunctionName?
             logger.error("Failed to create signature for function at %s (%s)",
-                hex(f.startEA), get_name(0, f.startEA) or "")
+                hex(f.startEA), get_name(f.startEA) or "")
 
     elif config.mode == NON_AUTO_FUNCTIONS:
         for f in get_functions():
@@ -345,7 +345,7 @@ def make_func_sigs(config):
                 except Exception as e:
                     logger.exception(e)
                     logger.error("Failed to create signature for function at %s (%s)",
-                        hex(f.startEA), get_name(0, f.startEA) or "")
+                        hex(f.startEA), get_name(f.startEA) or "")
 
     elif config.mode == LIBRARY_FUNCTIONS:
         for f in get_functions():
@@ -357,7 +357,7 @@ def make_func_sigs(config):
                 except Exception as e:
                     logger.exception(e)
                     logger.error("Failed to create signature for function at %s (%s)",
-                        hex(f.startEA), get_name(0, f.startEA) or "")
+                        hex(f.startEA), get_name(f.startEA) or "")
 
     elif config.mode == PUBLIC_FUNCTIONS:
         for f in get_functions():
@@ -369,7 +369,7 @@ def make_func_sigs(config):
                 except Exception as e:
                     logger.exception(e)
                     logger.error("Failed to create signature for function at %s (%s)",
-                        hex(f.startEA), get_name(0, f.startEA) or "")
+                        hex(f.startEA), get_name(f.startEA) or "")
 
     elif config.mode == ENTRY_POINT_FUNCTIONS:
         for i in zrange(get_func_qty()):
@@ -382,20 +382,20 @@ def make_func_sigs(config):
                 except Exception as e:
                     logger.exception(e)
                     logger.error("Failed to create signature for function at %s (%s)",
-                        hex(f.startEA), get_name(0, f.startEA) or "")
+                        hex(f.startEA), get_name(f.startEA) or "")
 
     elif config.mode == ALL_FUNCTIONS:
         n = get_func_qty()
         for i, f in enumerate(get_functions()):
             try:
-                logger.info("[ %d / %d ] %s %s", i + 1, n, get_name(0, f.startEA), hex(f.startEA))
+                logger.info("[ %d / %d ] %s %s", i + 1, n, get_name(f.startEA), hex(f.startEA))
                 sigs.append(make_func_sig(config, f))
             except FuncTooShortException:
                 pass
             except Exception as e:
                 logger.exception(e)
                 logger.error("Failed to create signature for function at %s (%s)",
-                    hex(f.startEA), get_name(0, f.startEA) or "")
+                    hex(f.startEA), get_name(f.startEA) or "")
 
     return sigs
 
