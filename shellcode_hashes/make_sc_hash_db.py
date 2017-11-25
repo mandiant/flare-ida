@@ -43,7 +43,7 @@ INTERESTING_DLLS = [
     'kernel32.dll', 'comctl32.dll', 'advapi32.dll', 'comdlg32.dll',
     'gdi32.dll',    'msvcrt.dll',   'netapi32.dll', 'ntdll.dll',
     'ntoskrnl.exe', 'oleaut32.dll', 'psapi.dll',    'shell32.dll',
-    'shlwapi.dll',  'srsvc.dll',    'urlmon.dll',   'user32.dll',
+    'shlwapi.dll',  'srvsvc.dll',   'urlmon.dll',   'user32.dll',
     'winhttp.dll',  'wininet.dll',  'ws2_32.dll',   'wship6.dll',
     'advpack.dll',
 ]
@@ -592,7 +592,7 @@ for c in input_string {
 return (acc_1 << 0x10) | acc2
 '''
 
-def hash_Carbanak(inString,fName):
+def HashPJW(inString,fName):
     a2 = map(ord, inString)
     ctr = 0
     for i in a2:
@@ -602,14 +602,15 @@ def hash_Carbanak(inString,fName):
 
     return ctr
 
-pseudocode_hash_Carbanak = '''
-    acc_1 = 0
-    for c in input_string:
-        acc_1 = (acc_1 << 4) + c
-        if (acc_1 & 0xF0000000):
-            acc_1 = (((acc_1 & 0xF0000000) >> 24) ^ acc_1) & 0x0FFFFFFF
+pseudocode_HashPJW = '''
+# Notably used in Carbanak
+acc = 0
+for c in input_string:
+    acc = (acc << 4) + c
+    if (acc & 0xF0000000):
+        acc = (((acc & 0xF0000000) >> 24) ^ acc) & 0x0FFFFFFF
 
-    return acc_1
+return acc
 '''
 
 def hash_ror13AddUpperDllnameHash32(inString,fName):
@@ -670,7 +671,7 @@ HASH_TYPES = [
     ('rol7XorHash32',           32, pseudocode_rol7XorHash32),
     ('rol7AddXor2Hash32',       32, pseudocode_rol7AddXor2Hash32),
     ('dualaccModFFF1Hash',      32, pseudocode_dualaccModFFF1Hash),
-    ('hash_Carbanak',           32, pseudocode_hash_Carbanak),
+    ('HashPJW',                 32, pseudocode_HashPJW),
     ('hash_ror13AddUpperDllnameHash32',32, pseudocode_hash_ror13AddUpperDllnameHash32),
 ]
 
