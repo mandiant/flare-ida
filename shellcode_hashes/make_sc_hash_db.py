@@ -67,22 +67,18 @@ create table symbol_hashes (
     lib_key         integer,
     symbol_name     varchar(256)
 );
-
 create table source_libs (
     lib_key         integer primary key,
     lib_name        varchar(256)
 );
-
 create table hash_types (
     hash_type       integer primary key,
     hash_size       integer,
     hash_name       varchar(256),
     hash_code       text
 );
-
 --Index just the hash vals for when we don't know the hash type
 create index idx_hash_val on symbol_hashes (hash_val);
-
 --Index with hash_type prefix for when we know the type we're
 -- looking for
 create index idx_hash_type_hash_val on symbol_hashes (hash_type, hash_val);
@@ -608,8 +604,41 @@ pseudocode_hash_Carbanak = '''
         acc_1 = (acc_1 << 4) + c
         if (acc_1 & 0xF0000000):
             acc_1 = (((acc_1 & 0xF0000000) >> 24) ^ acc_1) & 0x0FFFFFFF
-
     return acc_1
+'''
+
+def hash_ror13AddUpperDllnameHash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    dllHash = 0
+    for i in fName:
+        dllHash = ror(dllHash, 0xd, 32)
+        b = ord(i)
+        if b >= 0x61:
+            b -= 0x20
+        dllHash += b
+        dllHash = 0xffffffff & dllHash
+    for i in inString:
+        val = ror(val, 0xd, 32)
+        val += ord(i)
+        val = 0xffffffff & val
+    return 0xffffffff & (dllHash + val)
+
+
+
+pseudocode_hash_ror13AddUpperDllnameHash32 = '''
+acc := 0
+dllhash := 0
+for i in dllname {
+   dllhash := ROR(acc, 13);
+   dllhash := dllhash + toupper(c);
+}
+for i in input_string {
+   acc := ROR(acc, 13);
+   acc := acc + toupper(c);
+}
+return  acc + dllhash
 '''
 
 # as seen in Neutrino Bot launcher
@@ -652,6 +681,7 @@ HASH_TYPES = [
     ('rol7AddXor2Hash32',       32, pseudocode_rol7AddXor2Hash32),
     ('dualaccModFFF1Hash',      32, pseudocode_dualaccModFFF1Hash),
     ('hash_Carbanak',           32, pseudocode_hash_Carbanak),
+    ('hash_ror13AddUpperDllnameHash32',32, pseudocode_hash_ror13AddUpperDllnameHash32),
     ('fnv1Xor67f',              32, pseudocode_fnv1Xor67f),
 ]
 
@@ -844,4 +874,4 @@ if __name__ == '__main__':
     hasher.run()
     hasher.close()
     print "Done with symbol name hashing"
-
+    
