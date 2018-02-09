@@ -444,32 +444,6 @@ for c in input_string {
 }
 '''
 
-def playWith0xedb88320Hash(inString,fName):
-    esi = 0xFFFFFFFF
-    for d in inString:
-        c = ord(d)
-        for i in range(8):
-            eax = c
-            eax ^= esi
-            b0  = eax & 0xFF
-            b0 &= 0x01
-            b0  = -b0
-            if b0 % 2 == 0: # sbb eax, eax
-                eax = 0
-            else:
-                eax = 0xFFFFFFFF
-            eax &= 0xedb88320
-            esi >>= 1
-            esi ^= eax
-            c >>= 1
-    return esi ^ 0xFFFFFFFF
-
-pseudocode_playWith0xedb88320Hash = \
-'''Too hard to explain, AND's with 0xedb88320, though.
-String hash function from Gatak sample.
-See code for information'''
-
-
 def crc32(inString,fName):
     return 0xffffffff & (zlib.crc32(inString))
 
@@ -673,7 +647,6 @@ HASH_TYPES = [
     ('ror13AddHash32Sub1',      32, pseudocode_ror13AddHash32),
     ('shl7shr19Hash32',         32, pseudocode_shl7shr19Hash32),
     ('sll1AddHash32',           32, pseudocode_sll1AddHash32),
-    ('playWith0xedb88320Hash',  32, pseudocode_playWith0xedb88320Hash),
     ('crc32',                   32, 'Standard crc32'),
     ('mult21AddHash32',         32, pseudocode_hashMult21),
     ('add1505Shl5Hash32',       32, pseudocode_add1505Shl5Hash32),
