@@ -1,3 +1,18 @@
+########################################################################
+# Copyright 2018 FireEye
+#
+# Fireye licenses this file to you under the Apache License, Version
+# 2.0 (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at:
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
+########################################################################
 #
 # Stack strings helper
 # IDA's decompiler view shows stack strings in numerical form, a format highly unreadable.
@@ -71,10 +86,10 @@ class stack_strings_ah_t(ida_kernwin.action_handler_t):
         return 1
 
     def update(self, ctx):
-        return ida_kernwin.AST_ENABLE_FOR_WIDGET if \
-            ctx.widget_type == ida_kernwin.BWN_PSEUDOCODE else \
-            ida_kernwin.AST_DISABLE_FOR_WIDGET
-
+        if ctx.widget_type == ida_kernwin.BWN_PSEUDOCODE:
+            return ida_kernwin.AST_ENABLE_FOR_WIDGET
+        else:
+            return ida_kernwin.AST_DISABLE_FOR_WIDGET
 
 def cb(event, *args):
     if event == ida_hexrays.hxe_populating_popup:

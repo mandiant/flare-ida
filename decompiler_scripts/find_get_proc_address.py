@@ -1,7 +1,28 @@
-# Find calls to GetProcAddress and rename global variables
+########################################################################
+# Copyright 2018 FireEye
+#
+# Fireye licenses this file to you under the Apache License, Version
+# 2.0 (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at:
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
+########################################################################
+#
+# Find calls to GetProcAddress and rename the global variables
+# storing a pointer to the resolved APIs
+
 import idc
 import idaapi
+
 '''
+    Ctree's subtree (for reference)
+
     cot_asg
     /     \
    /       \
@@ -14,6 +35,7 @@ cot_obj  cot_cast
       /      |      \
  cot_obj  cot_var  cot_obj
 '''
+
 def findGetProcAddress(cfunc):
     class visitor(idaapi.ctree_visitor_t):
         def __init__(self, cfunc):
@@ -21,29 +43,25 @@ def findGetProcAddress(cfunc):
             self.cfunc = cfunc
 
         def visit_expr(self, i):
-            if (i.op == idaapi.cot_call):
-                    # look for calls to GetProcAddress
-                    if (idc.Name(i.x.obj_ea) == "GetProcAddress"):
+            if i.op == idaapi.cot_call:
+                # look for calls to GetProcAddress
+                if idc.Name(i.x.obj_ea) == "GetProcAddress":
 
-                        # ASCSTR_C == 0
-                        # check to see if the second argument is a c string
-                        if (idc.GetStringType(i.a[1].obj_ea) == 0):
-                            targetName = idc.GetString(i.a[1].obj_ea, -1, 0)
-                            #print "GetProcAdderss for: %s" % (targetName)
+                    # ASCSTR_C == 0
+                    # Check to see if the second argument is a C string
+                    if idc.GetStringType(i.a[1].obj_ea) == 0:
+                        targetName = idc.GetString(i.a[1].obj_ea, -1, 0)
 
-                            ## found function name
-                            ## look for global assignment
-                            parent = self.cfunc.body.find_parent_of(i)
-                            print "Parent type: %s" % parent.op
-                            if (parent.op == idaapi.cot_cast):
-                                # ignore casts and look for the parent
-                                parent = self.cfunc.body.find_parent_of(parent)
-                                print "Parent Parent type: %s" % parent.op
+                        # Found function name
+                        # Look for global assignment
+                        parent = self.cfunc.body.find_parent_of(i)
+                        if parent.op == idaapi.cot_cast:
+                            # Ignore casts and look for the parent
+                            parent = self.cfunc.body.find_parent_of(parent)
 
-                            if (parent.op == idaapi.cot_asg):
-                                # we want to find the left hand side
-                                print "Left Side %s %s" % (parent.cexpr.x.opname, hex(parent.cexpr.x.obj_ea))
-                                idc.MakeName(parent.cexpr.x.obj_ea, targetName + "_")
+                        if parent.op == idaapi.cot_asg:
+                            # We want to find the left hand side (x)
+                            idc.MakeName(parent.cexpr.x.obj_ea, targetName + "_")
 
             return 0
     
@@ -51,7 +69,6 @@ def findGetProcAddress(cfunc):
     v.apply_to(cfunc.body, None)
 
 def event_callback(event, *args):
-    
         if event == idaapi.hxe_maturity:
             cfunc, maturity = args
             if maturity == idaapi.CMAT_FINAL:
@@ -64,19 +81,8 @@ def main():
         return False
 
     print "Hex-rays version %s has been detected" % idaapi.get_hexrays_version()
-
     idaapi.install_hexrays_callback(event_callback)
-'''
-    f = idaapi.get_func(idaapi.get_screen_ea());
-    if f is None:
-        print "Please position the cursor within a function"
-        return True
 
-    cfunc = idaapi.decompile(f);
-    if cfunc is None:
-        print "Failed to decompile!"
-        return True
-    print "Decompiled function"
-'''
+
 if main():
     idaapi.term_hexrays_plugin();
