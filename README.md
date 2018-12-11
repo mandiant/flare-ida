@@ -66,5 +66,5 @@ A blog post with further information is available at:
 
 https://www.fireeye.com/blog/threat-research/2015/11/flare_ida_pro_script.html
 
-### objc2_xrefs_helper ###
-This script creates cross-references between selector references and their implementations as defined in the Objective-C 2.0 runtime related sections of the target Mach-O executable. This makes analysis of Objective-C code easier by enabling smooth transitions between an implementation and the locations where its selector is referenced throughout the code.
+### objc2_analyzer ###
+This script creates cross-references between selector references and their implementations as defined in the Objective-C  runtime related sections of the target Mach-O executable. It also patches selector reference pointers to instead point to their implementation function. This makes analysis of Objective-C code easier by enabling smooth transitions between an implementation and the locations where its selector is referenced throughout the code. Helpful Objective-C code comments are added to each call to objc_msgSend variants to clearly indicate which method is being called on which class.
