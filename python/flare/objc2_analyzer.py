@@ -1075,8 +1075,8 @@ class Objc2Analyzer():
         else:
             logging.debug("unsupported architecture, quitting..")
 
-        eh.iterate(targets, self.targetCallback, self.preEmuCallback,
-                   self.callHook, emuHook, userData, True)
+        eh.iterate(targets, self.targetCallback, preEmuCallback=self.preEmuCallback,
+                   callHook=self.callHook, instructionHook=emuHook, hookData=userData, resetEmuMem=True)
 
         # reload with patches
         eh.initEmuHelper()
