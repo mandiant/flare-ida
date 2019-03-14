@@ -406,7 +406,7 @@ for c in input_string {
 acc := acc - 1;
 '''
 
-def shl7shr19Hash32(inString,fName):
+def shl7Shr19XorHash32(inString,fName):
     val = 0
     for i in inString:
         edx = 0xffffffff & (val << 7)
@@ -416,7 +416,7 @@ def shl7shr19Hash32(inString,fName):
         val = eax ^ t
     return val
 
-pseudocode_shl7shr19Hash32 = '''acc := 0;
+pseudocode_shl7Shr19XorHash32 = '''acc := 0;
 for c in input_string {
    t0 = (acc << 7);
    t1 = (acc >> 0x19);
@@ -631,31 +631,476 @@ pseudocode_fnv1Xor67f = '''
     return acc
 '''
 
+def ror13AddHash32DllSimple(inString,fName):
+    dll_hash = 0
+    for c in fName:
+        dll_hash = ror(dll_hash, 0xd, 32)
+        if ord(c) < 97:
+            dll_hash = int(dll_hash) + ord(c)
+        else:
+            dll_hash = int(dll_hash) + ord(c) - 32
+
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = ror(val, 0xd, 32)
+        val += ord(i)
+    val += dll_hash
+    return val & 0xFFFFFFFF
+
+pseudocode_ror13AddHash32DllSimple = '''acc := 0;
+for c in input_string {
+   acc := ROR(acc, 13);
+   acc := acc + c;
+}
+acc := acc + ror13add(dll_name);
+'''
+
+def imul83hAdd(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = val * 131
+        val += ord(i)
+    val = val & 0x7FFFFFFF
+    return val
+
+pseudocode_imul83hAdd = '''acc := 0;
+for c in input_string {
+   acc := acc * 83h:
+   acc := acc + c;
+}
+'''
+
+def ror13AddHash32Sub20h(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = ror(val, 0xd, 32)
+        if ord(i) < 97:
+            val = int(val) + ord(i)
+        else:
+            val = int(val) + ord(i) - 32
+    return val
+
+pseudocode_ror13AddHash32Sub20h = '''acc := 0;
+for c in input_string {
+   acc := ROR(acc, 13);
+   if (c > 0x61)
+       c = c - 0x20;
+   acc := acc + c;
+}
+'''
+
+def rol3XorHash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = rol(val, 0x3, 32)
+        val = val ^ ord(i)
+    return val
+
+pseudocode_rol3XorHash32 = '''acc := 0;
+for c in input_string {
+   acc := ROL(acc, 3):
+   acc := acc ^ c;
+}
+'''
+
+def chAddRol8Hash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = val ^ (ord(i) * 256)
+        val = rol(val, 0x8, 32)
+        val_hex = "%08x"%val
+        valh_str = val_hex[4:6]
+        valh = int(valh_str, 16)
+        val = val ^ valh
+    return val
+
+pseudocode_chAddRol8Hash32 = '''acc := 0;
+for c in input_string {
+   acc := ch ^ c
+   acc := ROL(acc, 8):
+   acc := cl ^ ch;
+}
+'''
+
+def xorShr8Hash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0xFFFFFFFF
+    for i in inString:
+        ci = ord(i)
+        ci = ci ^ val
+        ci = ci * val
+        ci_hex = "%16x"%ci
+        ci_hex = ci_hex[8:16]
+        ci_hex = int(ci_hex, 16)
+        shr8 = val >> 8
+        val = ci_hex ^ shr8
+    return val
+
+pseudocode_xorShr8Hash32 = '''acc := 0;
+for c in input_string {
+   acc = (acc >> 8) ^ acc * (acc ^ c);
+}
+'''
+
+def addRor13Hash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val += ord(i)
+        val = ror(val, 0xd, 32)
+    return val
+
+pseudocode_addRor13Hash32 = '''acc := 0;
+for c in input_string {
+   acc := acc + c;
+   acc := ROR(acc, 13);
+}
+'''
+
+def addRor13HashOncemore32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val += ord(i)
+        val = ror(val, 0xd, 32)
+    val = ror(val, 0xd, 32)
+    return val
+
+pseudocode_addRor13HashOncemore32 = '''acc := 0;
+for c in input_string {
+   acc := acc + c;
+   acc := ROR(acc, 13);
+}
+acc := ROR(acc, 13);
+'''
+
+def addRol5HashOncemore32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val += ord(i)
+        val = rol(val, 0x5, 32)
+    val = rol(val, 0x5, 32)
+    return val
+
+pseudocode_addRol5HashOncemore32 = '''acc := 0;
+for c in input_string {
+   acc := acc + c;
+   acc := ROL(acc, 5);
+}
+acc := ROL(acc, 5);
+'''
+
+def or60hAddShl1Hash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val += ord(i) | 96
+        val = val << 1
+    return val
+
+pseudocode_or60hAddShl1Hash32 = '''acc := 0;
+for c in input_string {
+   acc := acc | 60h;
+   acc := acc << 1;
+}
+'''
+
+def or21hXorRor11Hash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    ors = 0
+    for i in inString:
+        ors = ord(i) | 33
+        val = val ^ ors
+        val = rol(val, 0xb, 32)
+    return val
+
+pseudocode_or21hXorRor11Hash32 = '''acc := 0;
+for c in input_string {
+   chr_or := chr | 21h;
+   acc := acc ^ chr_or;
+   acc := ROR(acc, 11);
+}
+'''
+
+def or23hXorRor17Hash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    ors = 0
+    for i in inString:
+        ors = ord(i) | 35
+        val = val ^ ors
+        val = rol(val, 0x11, 32)
+    return val
+
+pseudocode_or23hXorRor17Hash32 = '''acc := 0;
+for c in input_string {
+   chr_or := chr | 23h;
+   acc := acc ^ chr_or;
+   acc := ROR(acc, 17);
+}
+'''
+
+def rol9AddHash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = rol(val, 0x9, 32)
+        val += ord(i)
+    return val
+
+pseudocode_rol9AddHash32 = '''acc := 0;
+for c in input_string {
+   acc := ROL(acc, 9):
+   acc := acc + c;
+}
+'''
+
+def rol9XorHash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = rol(val, 0x9, 32)
+        val = val ^ ord(i)
+    return val
+
+pseudocode_rol9XorHash32 = '''acc := 0;
+for c in input_string {
+   acc := ROL(acc, 9):
+   acc := acc ^ c;
+}
+'''
+
+def xorRol9Hash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = val ^ ord(i)
+        val = rol(val, 0x9, 32)
+    return val
+
+pseudocode_xorRol9Hash32 = '''acc := 0;
+for c in input_string {
+   acc := acc ^ c;
+   acc := ROL(acc, 9):
+}
+'''
+
+def shl7Shr19AddHash32(inString,fName):
+    val = 0
+    for i in inString:
+        edx = 0xffffffff & (val << 7)
+        ecx = 0xffffffff & (val >> 0x19)
+        eax = edx | ecx
+        t = 0xff & ord(i)
+        val = eax + t
+    return val
+
+pseudocode_shl7Shr19AddHash32 = '''acc := 0;
+for c in input_string {
+   t0 = (acc << 7);
+   t1 = (acc >> 0x19);
+   t2 = t0 | t1;
+   acc = t2 + c;
+}
+'''
+
+def playWith0xe8677835Hash(inString,fName):
+    val = 0xFFFFFFFF
+    for i in inString:
+        val ^= ord(i)
+        for j in range(0, 8):
+            if (val&0x1) == 1:
+                val ^= 0xe8677835
+            val >>= 1
+    return val ^ 0xFFFFFFFF
+
+pseudocode_playWith0xe8677835Hash = '''
+TBC
+'''
+
+def rol5XorHash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = rol(val, 0x5, 32)
+        ors = ord(i) | 32
+        val = val ^ ors
+    return val
+
+pseudocode_rol5XorHash32 = '''acc := 0;
+for c in input_string {
+   acc := ROL(acc, 5):
+   acc := acc ^ c;
+}
+'''
+
+def shl7SubHash32DoublePulser(inString,fName):
+    eax = 0
+    edi = 0
+    for i in inString:
+        edi = 0xffffffff & (eax << 7)
+        eax = 0xffffffff & (edi - eax)
+        eax = eax + (0xff & ord(i))
+    edi = 0xffffffff & (eax << 7)
+    eax = 0xffffffff & (edi - eax)
+    return eax
+
+pseudocode_shl7SubHash32DoublePulser = '''acc := 0;
+for c in input_string {
+   t0 = (acc << 7);
+   t2 = t0 - t1;
+   acc = t2 + c;
+}
+'''
+
+def imul21hAddHash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0x1505
+    for i in inString:
+        val = (val * 0x21) & 0xFFFFFFFF
+        val = (val + (ord(i) & 0xFFFFFFDF)) & 0xFFFFFFFF
+    return val
+
+pseudocode_imul21hAddHash32 = '''acc := 0x1505;
+for c in input_string {
+   acc := acc * 21h;
+   acc := acc + (c & 0xFFFFFFDF);
+}
+acc := SHL(acc, 7) - acc
+'''
+
+def new_crc32(inString,fName):
+    crc32_table = [0] * 256
+    for i in xrange(256):
+	result = i << 24
+	for j in xrange(8):
+	    if (result & 0x80000000) == 0:
+		result = (2 * result) & 0xffffffff
+	    else:
+		result = ((2 * result) ^ 0x4C11DB7) & 0xffffffff
+	crc32_table[i] = result
+    result = 0xffffffff
+    for i in xrange(len(inString)):
+	result = (crc32_table[ ord(inString[i]) ^ ((result >> 24) & 0xff) ] ^ (result << 8)) & 0xffffffff
+
+    return (result ^ 0xffffffff) & 0xffffffff
+
+def shr2Shl5XorHash32(inString,fName):
+    result = 0x4e67c6a7
+    if inString.startswith("Nt") or inString.startswith("Zw"):
+        inString = inString[2:]
+    for i in inString:
+        result ^= (ord(i) + (result >> 2) + (result << 5)) & 0xffffffff
+    return result
+
+pseudocode_shr2Shl5XorHash32 = '''acc := 0x4e67c6a7;
+if input_string.startswith("Nt") or input_string.startswith("Zw") {
+   input_string += 2;
+}
+for c in input_string {
+   t0 := (acc >> 2);
+   t1 := (acc << 5);
+   acc := acc ^ (c + t0 + t1);
+}
+'''
+
+def rol8Xor0xB0D4D06Hash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString:
+        val = val ^ (ord(i) & 0xDF)
+        val = rol(val, 0x8, 32)
+        val = val + (ord(i) & 0xDF)
+    return (val ^ 0xB0D4D06) & 0xffffffff
+
+pseudocode_rol8Xor0xB0D4D06Hash32 = '''acc := 0;
+for c in input_string {
+   acc := ROL(acc, 8):
+   acc := acc ^ c ^ 0xB0D4D06;
+}
+
+Smork_bot
+'''
+
+def crc32Xor0xca9d4d4e(inString,fName):
+    return (0xffffffff & (zlib.crc32(inString))) ^ 0xca9d4d4e
+
+############################################################
+
 # The list of tuples of (supported hash name, hash size, pseudo_code)
 HASH_TYPES = [
-    ('ror13AddHash32',          32, pseudocode_ror13AddHash32),
+    ('ror7AddHash32',       32, pseudocode_ror7AddHash32),
+    ('ror9AddHash32',       32, pseudocode_ror9AddHash32),
+    ('ror11AddHash32',      32, pseudocode_ror11AddHash32),
+    ('ror13AddHash32',      32, pseudocode_ror13AddHash32),
     ('ror13AddWithNullHash32',  32, pseudocode_ror13AddWithNullHash32),
-    ('ror13AddHash32AddDll',    32, pseudocode_ror13AddHash32AddDll),
-    ('poisonIvyHash',           32, pseudocode_poisonIvyHash),
-    ('rol7AddHash32',           32, pseudocode_rol7AddHash32),
-    ('rol5AddHash32',           32, pseudocode_rol5AddHash32),
+    ('ror13AddHash32AddDll',   32, pseudocode_ror13AddHash32AddDll),
+    ('ror13AddHash32DllSimple',   32, pseudocode_ror13AddHash32DllSimple),
+    ('ror13AddHash32Sub20h', 32, pseudocode_ror13AddHash32Sub20h),
+    ('ror13AddHash32Sub1',  32, pseudocode_ror13AddHash32),
     ('addRor4WithNullHash32',   32, pseudocode_addRor4WithNullHash32),
-    ('rol3XorEax',              32, pseudocode_rol3XorEax),
-    ('ror7AddHash32',           32, pseudocode_ror7AddHash32),
-    ('ror9AddHash32',           32, pseudocode_ror9AddHash32),
-    ('ror11AddHash32',          32, pseudocode_ror11AddHash32),
-    ('ror13AddHash32Sub1',      32, pseudocode_ror13AddHash32),
-    ('shl7shr19Hash32',         32, pseudocode_shl7shr19Hash32),
-    ('sll1AddHash32',           32, pseudocode_sll1AddHash32),
-    ('crc32',                   32, 'Standard crc32'),
+    ('addRor13Hash32',      32, pseudocode_addRor13Hash32),
+    ('addRor13HashOncemore32',      32, pseudocode_addRor13HashOncemore32),
+    ('rol3XorEax',          32, pseudocode_rol3XorEax),
+    ('rol3XorHash32',       32, pseudocode_rol3XorHash32),
+    ('rol5AddHash32',       32, pseudocode_rol5AddHash32),
+    ('addRol5HashOncemore32',      32, pseudocode_addRol5HashOncemore32),
+    ('rol7AddHash32',       32, pseudocode_rol7AddHash32),
+    ('rol7AddXor2Hash32',       32, pseudocode_rol7AddXor2Hash32),
+    ('rol7XorHash32',       32, pseudocode_rol7XorHash32),
+    ('rol5XorHash32',       32, pseudocode_rol5XorHash32),
+    ('rol8Xor0xB0D4D06Hash32',       32, pseudocode_rol8Xor0xB0D4D06Hash32),
+    ('chAddRol8Hash32',     32, pseudocode_chAddRol8Hash32),
+    ('rol9AddHash32',       32, pseudocode_rol9AddHash32),
+    ('rol9XorHash32',       32, pseudocode_rol9XorHash32),
+    ('xorRol9Hash32',       32, pseudocode_xorRol9Hash32),
+    ('shl7Shr19XorHash32',     32, pseudocode_shl7Shr19XorHash32),
+    ('shl7Shr19AddHash32',     32, pseudocode_shl7Shr19AddHash32),
+    ('shl7SubHash32DoublePulser',     32, pseudocode_shl7SubHash32DoublePulser),
+    ('sll1AddHash32',       32, pseudocode_sll1AddHash32),
+    ('shr2Shl5XorHash32',   32, pseudocode_shr2Shl5XorHash32),
+    ('xorShr8Hash32',       32, pseudocode_xorShr8Hash32),
+    ('imul83hAdd',          32, pseudocode_imul83hAdd),
+    ('imul21hAddHash32',          32, pseudocode_imul21hAddHash32),
+    ('or60hAddShl1Hash32',          32, pseudocode_or60hAddShl1Hash32),
+    ('or21hXorRor11Hash32',          32, pseudocode_or21hXorRor11Hash32),
+    ('or23hXorRor17Hash32',          32, pseudocode_or23hXorRor17Hash32),
+    ('playWith0xe8677835Hash', 32, pseudocode_playWith0xe8677835Hash),
+    ('poisonIvyHash',       32, pseudocode_poisonIvyHash),
+    ('crc32',               32, 'Standard crc32'),
+    ('crc32Xor0xca9d4d4e',  32, 'crc32 ^ 0xCA9D4D4E'),
+    ('new_crc32',           32, 'same crc32'),
     ('mult21AddHash32',         32, pseudocode_hashMult21),
     ('add1505Shl5Hash32',       32, pseudocode_add1505Shl5Hash32),
-    ('rol7XorHash32',           32, pseudocode_rol7XorHash32),
-    ('rol7AddXor2Hash32',       32, pseudocode_rol7AddXor2Hash32),
     ('dualaccModFFF1Hash',      32, pseudocode_dualaccModFFF1Hash),
     ('hash_Carbanak',           32, pseudocode_hash_Carbanak),
     ('hash_ror13AddUpperDllnameHash32',32, pseudocode_hash_ror13AddUpperDllnameHash32),
-    ('fnv1Xor67f',              32, pseudocode_fnv1Xor67f),
+    ('fnv1Xor67f', 32, pseudocode_fnv1Xor67f),
 ]
 
 
