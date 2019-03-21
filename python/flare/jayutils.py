@@ -36,6 +36,11 @@ import idaapi
 import idautils
 import warnings
 
+# get the IDA version number
+ida_major, ida_minor = map(int, idaapi.get_kernel_version().split("."))
+using_ida7api = (ida_major > 6)
+
+
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore",category=DeprecationWarning)
 
@@ -45,14 +50,26 @@ def isWideString(inStr):
 def extractBasicWideString(inStr):
     return inStr[::2]
 
+########################################
 def isValidPointer(va):
+    if using_ida7api:
+        return isValidPointer_ida7(va)
     for segStart in idautils.Segments():
         if (va >= segStart) and (va < idc.SegEnd(segStart)):
             return True
     return False
 
+def isValidPointer_ida7(va):
+    for segStart in idautils.Segments():
+        if (va >= segStart) and (va < idc.get_segm_end(segStart)):
+            return True
+    return False
+
+########################################
 def getString(ea, maxLen=0x200):
     '''Returns up to 0x200 bytes, until a null is found'''
+    if using_ida7api:
+        return getString_ida7(ea, maxLen)
     i = 0
     retList = []
     while i < maxLen:
@@ -63,9 +80,25 @@ def getString(ea, maxLen=0x200):
         i += 1
     return ''.join(retList)
 
+def getString_ida7(ea, maxLen=0x200):
+    '''Returns up to 0x200 bytes, until a null is found'''
+    i = 0
+    retList = []
+    while i < maxLen:
+        b = idc.get_db_byte(ea+i)
+        if b == 0x00:
+            break
+        retList.append(chr(b))
+        i += 1
+    return ''.join(retList)
+
+
+########################################
 HARD_NAME_RE = re.compile(r'''(\w+)_(\d+)''')
 def makeNameHard(ea, name):
     '''Keeps trying to name the given ea until it works, adding the optional _%d suffix'''
+    if using_ida7api:
+        return makeNameHard_ida7(ea, name)
     count = 0
     ret = idc.MakeNameEx(ea, name, idc.SN_PUBLIC|idc.SN_NOWARN)
     m = HARD_NAME_RE.match(name)
@@ -79,11 +112,29 @@ def makeNameHard(ea, name):
             ret = idc.MakeNameEx(ea, newName, idc.SN_PUBLIC|idc.SN_NOWARN)
             count += 1
  
+def makeNameHard_ida7(ea, name):
+    '''Keeps trying to name the given ea until it works, adding the optional _%d suffix'''
+    count = 0
+    ret = idc.set_name(ea, name, idc.SN_PUBLIC|idc.SN_NOWARN)
+    m = HARD_NAME_RE.match(name)
+    if m is not None:
+        #already a name in <name>_<count>  format
+        name, count = m.group(1,2)
+        count = int(count)
+    if ret == 0:
+        while (count < 100) and (ret == 0):
+            newName = '%s_%d' % (name, count)
+            ret = idc.set_name(ea, newName, idc.SN_PUBLIC|idc.SN_NOWARN)
+            count += 1
+
+########################################
 def getx86CodeSize(ea=None):
     '''
     For a given EA, finds the code size. Returns 16 for-16bit, 32 for 32-bit, or 64 for 64-bit.
     If no EA is given, searches through all segments for a code segment to use.
     '''
+    if using_ida7api:
+        return getx86CodeSize_ida7(ea)
     if ea is None:
         for seg in idautils.Segments():
             if idc.GetSegmentAttr(seg, idc.SEGATTR_TYPE) == idc.SEG_CODE:
@@ -99,6 +150,30 @@ def getx86CodeSize(ea=None):
     elif bitness == 2:
         return 64
     raise RuntimeError('Bad bitness')
+
+
+def getx86CodeSize_ida7(ea=None):
+    '''
+    For a given EA, finds the code size. Returns 16 for-16bit, 32 for 32-bit, or 64 for 64-bit.
+    If no EA is given, searches through all segments for a code segment to use.
+    '''
+    if ea is None:
+        for seg in idautils.Segments():
+            if idc.get_segm_attr(seg, idc.SEGATTR_TYPE) == idc.SEG_CODE:
+                ea = seg
+                break
+    if ea is None:
+        raise RuntimeError('Could not find code segment to use for getx86CodeSize')
+    bitness = idc.get_segm_attr(ea, idc.SEGATTR_BITNESS)
+    if bitness == 0:
+        return 16
+    elif bitness == 1:
+        return 32
+    elif bitness == 2:
+        return 64
+    raise RuntimeError('Bad bitness')
+
+########################################
 
  
 ###############################################################################
@@ -206,8 +281,11 @@ NETNODE_NAME = '$ jayutils'
 
 VIV_WORKSPACE_NAME = 'viv_workspace_path'
 
+############################################################
 def getInputFilepath():
     '''Returns None if the uesr cancels. Updates the filepath in the idb on success'''
+    if using_ida7api:
+        return getInputFilepath_ida7()
     filePath = idc.GetInputFilePath()
     if not os.path.exists(filePath):
         print 'IDB input file not found. Prompting for new one: %s' % filePath
@@ -215,6 +293,19 @@ def getInputFilepath():
         if filePath is not None:
             idc.SetInputFilePath(filePath)
     return filePath
+
+
+def getInputFilepath_ida7():
+    '''Returns None if the uesr cancels. Updates the filepath in the idb on success'''
+    filePath = idc.get_input_file_path()
+    if not os.path.exists(filePath):
+        print 'IDB input file not found. Prompting for new one: %s' % filePath
+        filePath = idaapi.ask_file(False, '*.*', 'Enter path to idb input file')
+        if filePath is not None:
+            idc.set_root_filename(filePath)
+    return filePath
+############################################################
+
 
 def loadWorkspace(filename, fast=False):
     import vivisect
