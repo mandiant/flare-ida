@@ -5,6 +5,7 @@
 ########################################################################
 # Copyright 2012 Mandiant
 # Copyright 2014 FireEye
+# Copyright 2019 FireEye
 #
 # Mandiant licenses this file to you under the Apache License, Version
 # 2.0 (the "License"); you may not use this file except in compliance with the

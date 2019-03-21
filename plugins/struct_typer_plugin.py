@@ -5,6 +5,7 @@
 ########################################################################
 # Copyright 2013 Mandiant
 # Copyright 2014 FireEye
+# Copyright 2019 FireEye
 #
 # Mandiant licenses this file to you under the Apache License, Version
 # 2.0 (the "License"); you may not use this file except in compliance with the
@@ -28,13 +29,15 @@ import idc
 import idautils  
 import idaapi
 
+idaapi.require('flare')
+idaapi.require('flare.struct_typer')
+
 class struct_typer_plugin_t(idaapi.plugin_t):
     flags = idaapi.PLUGIN_UNL
     comment = "This is a comment"
 
     help = "This is help"
     wanted_name = "StructTyper"
-    #wanted_hotkey = "Alt-F8"
     wanted_hotkey = ""
 
     def init(self):
@@ -43,8 +46,6 @@ class struct_typer_plugin_t(idaapi.plugin_t):
 
     def run(self, arg):
         #idaapi.msg("StructTyper run() called with %d!\n" % arg)
-        idaapi.require('flare')
-        idaapi.require('flare.struct_typer')
         flare.struct_typer.main()
 
     def term(self):
