@@ -31,6 +31,10 @@ import idc
 import idautils  
 import idaapi
 
+idaapi.require('flare')
+idaapi.require('flare.apply_callee_type')
+idaapi.require('flare.jayutils')
+
 PLUGIN_HELP = "This is help"
 PLUGIN_NAME = "ApplyCalleeType"
 PREFERRED_SHORTCUT = "Alt-J"
@@ -103,9 +107,7 @@ class apply_callee_type_plugin_t(idaapi.plugin_t):
 
     def init(self):
         idaapi.msg('apply_callee_type_plugin:init\n')
-        idaapi.require('flare')
-        idaapi.require('flare.apply_callee_type')
-        idaapi.require('flare.jayutils')
+
         installMenu()
         return idaapi.PLUGIN_OK
 
