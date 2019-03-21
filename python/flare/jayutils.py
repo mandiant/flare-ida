@@ -186,6 +186,9 @@ def errorHex(self, inBytes, msg, *args, **kwargs):
 # add hexprinting to existing loggers that obey logging level semantics
 def getLogger(name=None):
     logger = logging.getLogger(name)
+    return _addHexLogging(logger)
+
+def _addHexLogging(logger):
     logger.doHexLog = types.MethodType(doHexLog, logger)
     logger.debugHex = types.MethodType(debugHex, logger)
     logger.infoHex = types.MethodType(infoHex, logger)

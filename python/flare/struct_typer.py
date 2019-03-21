@@ -4,7 +4,7 @@
 # 
 ########################################################################
 # Copyright 2013 Mandiant
-# Copyright 2014 FireEye
+# Copyright 2014,2018 FireEye
 #
 # Mandiant licenses this file to you under the Apache License, Version
 # 2.0 (the "License"); you may not use this file except in compliance with the
@@ -40,44 +40,51 @@ import idautils
 import jayutils
 from struct_typer_widget import Ui_Dialog
 
+# get the IDA version number
+ida_major, ida_minor = map(int, idaapi.get_kernel_version().split("."))
+using_ida7api = (ida_major > 6)
+
+logger = None
+
 ############################################################
-# Several type-related functions aren't accessibly via IDAPython
+# In older IDAPython, several type-related functions aren't accessible
 # so have to do things with ctypes
-idaname = "ida64" if idc.__EA64__ else "ida"
-if sys.platform == "win32":
-    g_dll = ctypes.windll[idaname + ".wll"]
-elif sys.platform == "linux2":
-    g_dll = ctypes.cdll["lib" + idaname + ".so"]
-elif sys.platform == "darwin":
-    g_dll = ctypes.cdll["lib" + idaname + ".dylib"]
+if not using_ida7api:
+    idaname = "ida64" if idc.__EA64__ else "ida"
+    if sys.platform == "win32":
+        g_dll = ctypes.windll[idaname + ".wll"]
+    elif sys.platform == "linux2":
+        g_dll = ctypes.cdll["lib" + idaname + ".so"]
+    elif sys.platform == "darwin":
+        g_dll = ctypes.cdll["lib" + idaname + ".dylib"]
 
-############################################################
-# Specifying function types for a few IDA SDK functions to keep the 
-# pointer-to-pointer args clear.
-get_named_type = g_dll.get_named_type
-get_named_type.argtypes = [
-    ctypes.c_void_p,                                #const til_t *ti,
-    ctypes.c_char_p,                                #const char *name,
-    ctypes.c_int,                                   #int ntf_flags,
-    ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const type_t **type=NULL,
-    ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const p_list **fields=NULL,
-    ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const char **cmt=NULL,
-    ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const p_list **fieldcmts=NULL,
-    ctypes.POINTER(ctypes.c_ulong),                 #sclass_t *sclass=NULL,
-    ctypes.POINTER(ctypes.c_ulong),                 #uint32 *value=NULL);
-]
+    ############################################################
+    # Specifying function types for a few IDA SDK functions to keep the 
+    # pointer-to-pointer args clear.
+    get_named_type = g_dll.get_named_type
+    get_named_type.argtypes = [
+        ctypes.c_void_p,                                #const til_t *ti,
+        ctypes.c_char_p,                                #const char *name,
+        ctypes.c_int,                                   #int ntf_flags,
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const type_t **type=NULL,
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const p_list **fields=NULL,
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const char **cmt=NULL,
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), #const p_list **fieldcmts=NULL,
+        ctypes.POINTER(ctypes.c_ulong),                 #sclass_t *sclass=NULL,
+        ctypes.POINTER(ctypes.c_ulong),                 #uint32 *value=NULL);
+    ]
 
-print_type_to_one_line = g_dll.print_type_to_one_line
-print_type_to_one_line.argtypes = [
-    ctypes.c_char_p,                #char  *buf,
-    ctypes.c_ulong,                 #size_t bufsize,
-    ctypes.c_void_p,                #const til_t *ti,
-    ctypes.POINTER(ctypes.c_ubyte), #const type_t *pt,
-    ctypes.c_char_p,                #const char *name = NULL,
-    ctypes.POINTER(ctypes.c_ubyte), #const char *cmt = NULL,
-    ctypes.POINTER(ctypes.c_ubyte), #const p_list *field_names = NULL,
-    ctypes.POINTER(ctypes.c_ubyte), #const p_list *field_cmts = NULL);
-]
+    print_type_to_one_line = g_dll.print_type_to_one_line
+    print_type_to_one_line.argtypes = [
+        ctypes.c_char_p,                #char  *buf,
+        ctypes.c_ulong,                 #size_t bufsize,
+        ctypes.c_void_p,                #const til_t *ti,
+        ctypes.POINTER(ctypes.c_ubyte), #const type_t *pt,
+        ctypes.c_char_p,                #const char *name = NULL,
+        ctypes.POINTER(ctypes.c_ubyte), #const char *cmt = NULL,
+        ctypes.POINTER(ctypes.c_ubyte), #const p_list *field_names = NULL,
+        ctypes.POINTER(ctypes.c_ubyte), #const p_list *field_cmts = NULL);
+    ]
 
 ############################################################
 
@@ -111,10 +118,30 @@ def stripNumberedName(name):
         idx -= 1
     return name
 
+
+def loadMembersIDA7(struc, sid):
+    '''Returns list of tuples of (offset, memberName, member)'''
+    #mixing idc & idaapi, kinda annoying but need low-level idaapi for a 
+    # type access, but cant dig into structs...
+    members = []
+    off = idaapi.get_struc_first_offset(struc) 
+    while off != idc.BADADDR:
+        logger.debug('struc offset: 0x%x (%d)', off, off)
+        member = idaapi.get_member(struc, off)
+        if (member == 0) or (member is None):
+            pass    #not really an error, i guess
+        else:
+            members.append( (off, idc.get_member_name(sid, off), member) )
+        off = idaapi.get_struc_next_offset(struc, off )
+    members.sort(key = lambda mem: mem[0])
+    return members
+
 def loadMembers(struc, sid):
     '''Returns list of tuples of (offset, memberName, member)'''
     #mixing idc & idaapi, kinda annoying but need low-level idaapi for a 
     # type access, but cant dig into structs...
+    if using_ida7api:
+        return loadMembersIDA7(struc, sid)
     members = []
     off = g_dll.get_struc_first_offset(struc) 
     while off >= 0:
@@ -144,16 +171,17 @@ class StructTyperWidget(QtWidgets.QDialog):
     def __init__(self, parent=None):
         QtWidgets.QDialog.__init__(self, parent)
         try:
-            self.logger = jayutils.getLogger('StructTyperWidget')
-            self.logger.debug('StructTyperWidget starting up')
+            logger.debug('StructTyperWidget starting up')
             self.ui=Ui_Dialog()
             self.ui.setupUi(self)
             self.ui.lineEdit.setText(g_DefaultPrefixRegexp)
             self.ui.checkBox.setChecked(Qt.Unchecked)
         except Exception, err:
-            self.logger.exception('Error during init: %s', str(err))
+            logger.exception('Error during init: %s', str(err))
 
     def getActiveStruct(self):
+        if self.ui.listWidget.currentItem() is None:
+            return None
         return str(self.ui.listWidget.currentItem().data(Qt.DisplayRole))
 
     def setStructs(self, structs):
@@ -169,12 +197,10 @@ class StructTyperWidget(QtWidgets.QDialog):
 ############################################################
 
 class StructTypeRunner(object):
-    def __init__(self):
-        self.logger = jayutils.getLogger('SearchLauncher')
 
     def run(self):
         try:
-            self.logger.debug('Starting up')
+            logger.debug('Starting up')
             dlg = StructTyperWidget()
             dlg.setStructs(loadStructs())
             oldTo = idaapi.set_script_timeout(0)
@@ -186,20 +212,32 @@ class StructTypeRunner(object):
                 struc = None
                 if dlg.ui.rb_useStackFrame.isChecked():
                     ea = idc.here()
-                    sid = idc.GetFrame(ea)
+                    if using_ida7api:
+                        sid = idc.get_frame_id(ea)
+                    else:
+                        sid = idc.GetFrame(ea)
                     struc = idaapi.get_frame(ea)
-                    self.logger.debug('Dialog result: accepted stack frame')
+                    logger.debug('Dialog result: accepted stack frame')
                     if (sid is None) or (sid == idc.BADADDR):
                         #i should really figure out which is the correct error case
                         raise RuntimeError('Failed to get sid for stack frame at 0x%x' % ea) 
                     if (struc is None) or (struc == 0) or (struc == idc.BADADDR):
                         raise RuntimeError('Failed to get struc_t for stack frame at 0x%x' % ea)
-                    #need the actual pointer value, not the swig wrapped struc_t
-                    struc= long(struc.this)
+                    if using_ida7api:
+                        pass
+                    else:
+                        #need the actual pointer value, not the swig wrapped struc_t
+                        struc= long(struc.this)
                 else:
                     structName = dlg.getActiveStruct()
-                    self.logger.debug('Dialog result: accepted %s "%s"', type(structName), structName)
-                    sid = idc.GetStrucIdByName(structName)
+                    if structName is None:
+                        print("No struct selected. Bailing out")
+                        return
+                    logger.debug('Dialog result: accepted %s "%s"', type(structName), structName)
+                    if using_ida7api:
+                        sid = idc.get_struc_id(structName)
+                    else:
+                        sid = idc.GetStrucIdByName(structName)
                     if (sid is None) or (sid == idc.BADADDR):
                         #i should really figure out which is the correct error case
                         raise RuntimeError('Failed to get sid for %s' % structName) 
@@ -207,23 +245,33 @@ class StructTypeRunner(object):
                     if (tid is None) or (tid == 0) or (tid == idc.BADADDR):
                         #i should really figure out which is the correct error case
                         raise RuntimeError('Failed to get tid_t for %s' % structName)
-                    struc = g_dll.get_struc(tid)
+                    if using_ida7api:
+                        struc = idaapi.get_struc(tid)
+                    else:
+                        struc = g_dll.get_struc(tid)
                     if (struc is None) or (struc == 0) or (struc == idc.BADADDR):
                         raise RuntimeError('Failed to get struc_t for %s' % structName)
                 foundMembers = self.processStruct(regPrefix, struc, sid)
                 if dlg.ui.rb_useStackFrame.isChecked() and (foundMembers != 0):
                     #reanalyze current function if we're analyzing a stack frame & found some func pointers
-                    funcstart = idc.GetFunctionAttr(idc.here(), idc.FUNCATTR_START)
-                    funcend = idc.GetFunctionAttr(idc.here(), idc.FUNCATTR_END)
+                    if using_ida7api:
+                        funcstart = idc.get_func_attr(idc.here(), idc.FUNCATTR_START)
+                        funcend = idc.get_func_attr(idc.here(), idc.FUNCATTR_END)
+                    else:
+                        funcstart = idc.GetFunctionAttr(idc.here(), idc.FUNCATTR_START)
+                        funcend = idc.GetFunctionAttr(idc.here(), idc.FUNCATTR_END)
                     if (funcstart != idc.BADADDR) and (funcend != idc.BADADDR):
-                        idc.AnalyzeArea(funcstart, funcend)
+                        if using_ida7api:
+                            idc.plan_and_wait(funcstart, funcend)
+                        else:
+                            idc.AnalyzeArea(funcstart, funcend)
             elif res == QtWidgets.QDialog.Rejected:
-                self.logger.info('Dialog result: canceled by user')
+                logger.info('Dialog result: canceled by user')
             else:
-                self.logger.debug('Unknown result')
+                logger.debug('Unknown result')
                 raise RuntimeError('Dialog unknown result')
         except Exception, err:
-            self.logger.exception("Exception caught: %s", str(err))
+            logger.exception("Exception caught: %s", str(err))
 
     def filterName(self, regPrefix, name):
         funcname = stripNumberedName(name)
@@ -231,22 +279,47 @@ class StructTypeRunner(object):
             reg = re.compile('('+regPrefix+')(.*)')
             m = reg.match(funcname)
             if m is not None:
-                self.logger.debug('Stripping prefix: %s -> %s', name, m.group(2))
+                logger.debug('Stripping prefix: %s -> %s', name, m.group(2))
                 funcname = m.group(2)
             else:
                 #if it does not match, continue to see if it can still match
                 pass
         return funcname
 
+    def processStructIDA7(self, regPrefix, struc, sid):
+        members = loadMembers(struc, sid)
+        foundFunctions = 0
+        for off, name, memb in members:
+            funcname  = self.filterName(regPrefix, name)
+            tup = idaapi.get_named_type(None, funcname, idaapi.NTF_SYMM)
+            if tup is None:
+                continue
+            code, type_str, fields_str, cmt, field_cmts, sclass, value  = tup
+            foundFunctions += 1
+            tif = idaapi.tinfo_t()
+            tif.deserialize(None, type_str, fields_str, cmt)
+            if not tif.is_func():
+                logger.debug('Found named type, but not a function: %s', funcname)
+                continue
+            tif.create_ptr(tif)
+            ret = idaapi.set_member_tinfo(struc, memb, off, tif, 0)
+            if ret != idaapi.SMT_OK:
+                logger.info("Got set_member_tinfo ret code: %d" % ret)
+            else:
+                logger.info('set_member_tinfo: %s', tif.dstr())
+
     def processStruct(self, regPrefix, struc, sid):
         '''
         Returns the number of identified struct members whose type was found
         '''
+        if using_ida7api:
+            return self.processStructIDA7(regPrefix, struc, sid)
         til = ctypes.c_void_p.in_dll(g_dll, 'idati')
         members = loadMembers(struc, sid)
         foundFunctions = 0
         for off, name, memb in members:
             funcname  = self.filterName(regPrefix, name)
+
 
             typ_type = ctypes.POINTER(ctypes.c_ubyte)()
             typ_fields = ctypes.POINTER(ctypes.c_ubyte)()
@@ -266,13 +339,13 @@ class StructTypeRunner(object):
                     ctypes.byref(value)
             )
             if ret == 0:
-                self.logger.debug('Could not find %s', funcname)
+                logger.debug('Could not find %s', funcname)
             else:
                 foundFunctions += 1
                 if typ_type[0] != idaapi.BT_FUNC:
                     #not positive that the first type value has to be BT_FUNC or not...
                     # and whether it's important to only apply to funcs or not
-                    self.logger.debug('Found named type, but not a function: %s', funcname)
+                    logger.debug('Found named type, but not a function: %s', funcname)
                 else:
                     type_arr = ctypes.create_string_buffer(0x400)
                     type_arr[0] = chr(idaapi.BT_PTR)
@@ -298,15 +371,16 @@ class StructTypeRunner(object):
                         typ_fieldcmts
                     )
                     if ret == 0:
-                        self.logger.info('Failed to set_member_tinfo: %s', name_buffer.value)
+                        logger.info('Failed to set_member_tinfo: %s', name_buffer.value)
                     else:
-                        self.logger.info('set_member_tinfo: %s', name_buffer.value)
+                        logger.info('set_member_tinfo: %s', name_buffer.value)
         return foundFunctions
             
 
 def main():
-    #logger = jayutils.configLogger('', logging.DEBUG)
-    logger = jayutils.configLogger('', logging.INFO)
+    global logger
+    #logger = jayutils.configLogger(__name__, logging.DEBUG)
+    logger = jayutils.configLogger(__name__, logging.INFO)
     launcher = StructTypeRunner()
     launcher.run()
 

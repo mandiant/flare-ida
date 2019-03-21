@@ -239,8 +239,8 @@ def isLikelyFalsePositiveString(instr):
 
 def main(doAllFuncs=True):
     #doAllFuncs=False
-    #jayutils.configLogger('', logging.DEBUG)
-    jayutils.configLogger('', logging.INFO)
+    #jayutils.configLogger(__name__, logging.DEBUG)
+    jayutils.configLogger(__name__, logging.INFO)
     logger = jayutils.getLogger('stackstrings')
     logger.debug('Starting up now')
     filePath = jayutils.getInputFilepath()
