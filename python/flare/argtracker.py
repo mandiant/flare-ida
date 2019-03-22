@@ -412,8 +412,8 @@ class ArgTracker(object):
 
 
 def main():
-    #jayutils.configLogger(None, logging.DEBUG)
-    jayutils.configLogger(None, logging.INFO)
+    #jayutils.configLogger(__name__, logging.DEBUG)
+    jayutils.configLogger(__name__, logging.INFO)
     logger = jayutils.getLogger('')
     logger.debug('Starting up in main')
     #name = idc.AskStr('CreateThread', 'Enter function to find args for')

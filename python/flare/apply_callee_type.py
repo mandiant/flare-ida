@@ -43,6 +43,12 @@ import jayutils
 
 from apply_callee_type_widget import Ui_ApplyCalleeDialog
 
+logger = None
+
+# get the IDA version number
+ida_major, ida_minor = map(int, idaapi.get_kernel_version().split("."))
+using_ida7api = (ida_major > 6)
+
 MSDN_MACROS = [
 ' _In_ ',
 ' _Out_ ',
@@ -65,23 +71,23 @@ def manualTypeCopy(dest, destOff, destLen, src):
 
 
 class ApplyCalleeTypeRunner(object):
-    def __init__(self):
-        self.logger = jayutils.getLogger('ApplyCalleeType')
+    #def __init__(self):
+    #    self.logger = jayutils.getLogger('ApplyCalleeType')
 
     def getUserDeclType(self, decl):
         tinfo = idaapi.tinfo_t()
-        #self.logger.debug('Trying to parse declaration: %r', decl)
+        #logger.debug('Trying to parse declaration: %r', decl)
         ret = idaapi.parse_decl2(idaapi.cvar.idati, decl, tinfo, idaapi.PT_TYP)
-        #self.logger.debug('Return from parse_decl2: %r', ret)
+        #logger.debug('Return from parse_decl2: %r', ret)
         if ret is None:
-            self.logger.info('parse_decl2 failed')
+            logger.info('parse_decl2 failed')
             return None
         return tinfo
 
     def getLocalType(self):
         ret = idaapi.choose_local_tinfo(idaapi.cvar.idati, 'Choose local type to apply', None, None)
         if not ret:
-            self.logger.debug('User canceled. Bailing out')
+            logger.debug('User canceled. Bailing out')
             return
         #ret is a numbered type rather than the name
         tinfo = idaapi.tinfo_t()
@@ -99,17 +105,20 @@ class ApplyCalleeTypeRunner(object):
             return self.getBuiltinGlobalTypeCtypes()
 
     def getBuiltinGlobalTypePython(self):
-        self.logger.debug('Getting GlobalType the Python way')
+        logger.debug('Getting GlobalType the Python way')
         sym = idaapi.til_symbol_t()
-        ret = idaapi.choose_named_type2(idaapi.cvar.idati, 'Choose type to apply', idaapi.NTF_SYMM, None, sym)
+        if using_ida7api:
+            ret = idaapi.choose_named_type(sym, idaapi.get_idati(), 'Choose type to apply', idaapi.NTF_SYMM, None)
+        else:
+            ret = idaapi.choose_named_type2(idaapi.cvar.idati, 'Choose type to apply', idaapi.NTF_SYMM, None, sym)
         if not ret:
-            self.logger.debug('User canceled. Bailing out')
+            logger.debug('User canceled. Bailing out')
             return
 
         tuple = idaapi.get_named_type(sym.til, sym.name, 0)
 
         if tuple == None:
-            self.logger.debug('Could not find %s', sym.name)
+            logger.debug('Could not find %s', sym.name)
             return
 
         tinfo = idaapi.tinfo_t()
@@ -118,7 +127,7 @@ class ApplyCalleeTypeRunner(object):
         return tinfo
 
     def getBuiltinGlobalTypeCtypes(self):
-        self.logger.debug('Getting GlobalType the Ctypes way')
+        logger.debug('Getting GlobalType the Ctypes way')
 
         ############################################################
         # Several type-related functions aren't accessibly via IDAPython
@@ -152,7 +161,7 @@ class ApplyCalleeTypeRunner(object):
         #idaapi.choose_named_type2(idaapi.cvar.idati, 'Choose type to apply', idaapi.NTF_SYMM, predFunc, sym)
         ret = idaapi.choose_named_type2(idaapi.cvar.idati, 'Choose type to apply', idaapi.NTF_SYMM, None, sym)
         if not ret:
-            self.logger.debug('User canceled. Bailing out')
+            logger.debug('User canceled. Bailing out')
             return
         til = sym.til
         funcname = sym.name
@@ -175,14 +184,14 @@ class ApplyCalleeTypeRunner(object):
                 ctypes.byref(value)
         )
         if ret == 0:
-            self.logger.debug('Could not find %s', funcname)
+            logger.debug('Could not find %s', funcname)
             return
         ########################################
         # the following isn't needed, as moved to tinfo_t usage
         #if typ_type[0] != idaapi.BT_FUNC:
         #    #not positive that the first type value has to be BT_FUNC or not...
         #    # and whether it's important to only apply to funcs or not
-        #    self.logger.debug('Found named type, but not a function: %s', funcname)
+        #    logger.debug('Found named type, but not a function: %s', funcname)
         #    return
         #type_arr = ctypes.create_string_buffer(0x400)
         #type_arr[0] = chr(idaapi.BT_PTR)
@@ -198,19 +207,19 @@ class ApplyCalleeTypeRunner(object):
         #    typ_fields,
         #    typ_fieldcmts
         #)
-        #self.logger.info('Found type: %s', name_buffer.value)
+        #logger.info('Found type: %s', name_buffer.value)
         ########################################
         #this works as well, but it's deprecated
-        #self.logger.info('Trying to set type: %s', name_buffer.value)
+        #logger.info('Trying to set type: %s', name_buffer.value)
         #ret = g_dll.apply_callee_type(
         #    ctypes.c_uint(here),
         #    type_arr,
         #    typ_fields
         #)
         tinfo = idaapi.tinfo_t()
-        #self.logger.info('Trying to deserialize stuff')
-        #self.logger.info('Type of til: %s', type(til))
-        #self.logger.info('Type of typ_type: %s', type(typ_type))
+        #logger.info('Trying to deserialize stuff')
+        #logger.info('Type of til: %s', type(til))
+        #logger.info('Type of typ_type: %s', type(typ_type))
         ret = g_dll.deserialize_tinfo(
             long(tinfo.this),
             long(til.this), 
@@ -228,16 +237,24 @@ class ApplyCalleeTypeRunner(object):
         return stin
 
     def run(self):
-        self.logger.info('Starting up')
+        logger.debug('Starting up')
         try:
             here = idc.here()
-            self.logger.info('Using ea: 0x%08x', here)
-        
-            if not idc.GetMnem(here).startswith('call'):
-                self.logger.info('Not running at a call instruction. Bailing out now')
+            logger.info('Using ea: 0x%08x', here)
+            if using_ida7api:
+                mnem = idc.print_insn_mnem(here)
+            else:
+                mnem =  idc.GetMnem(here)
+            if not mnem.startswith('call'):
+                logger.info('Not running at a call instruction. Bailing out now')
                 return
-            if idc.GetOpType(here, 0) == idc.o_near:
-                self.logger.info("Cannot (or shouldn't) run when call optype is o_near")
+
+            if using_ida7api:
+                optype = idc.get_operand_type(here, 0) 
+            else:
+                optype = idc.GetOpType(here, 0) 
+            if optype == idc.o_near:
+                logger.info("Cannot (or shouldn't) run when call optype is o_near")
                 return
 
             dlg = ApplyCalleeTypeWidget()
@@ -246,9 +263,9 @@ class ApplyCalleeTypeRunner(object):
             idaapi.set_script_timeout(oldTo)
 
             if res == QtWidgets.QDialog.Accepted:
-                self.logger.debug('Dialog accepted. Input type: %d', dlg.inputType)
+                logger.debug('Dialog accepted. Input type: %d', dlg.inputType)
             else:
-                self.logger.debug('Dialog rejected')
+                logger.debug('Dialog rejected')
                 return
 
             tinfo = None
@@ -261,28 +278,31 @@ class ApplyCalleeTypeRunner(object):
             elif dlg.inputType == dlg.LOCAL_TYPE:
                 tinfo = self.getLocalType()
             else:
-                self.logger.info('Bad user input type')
+                logger.info('Bad user input type')
                 return
             if tinfo is None:
-                self.logger.debug('Bailing due to null tinfo')
+                logger.debug('Bailing due to null tinfo')
                 return
-            #self.logger.info('Deserialize result: %r', ret)
+            #logger.info('Deserialize result: %r', ret)
             #not 100% sure if i need to explicitly convert from func to funcptr - seemed
             # to pretty much work without this, but doing it just to be sure
             if not tinfo.is_funcptr():
-                self.logger.debug('Converting to func pointer')
+                logger.debug('Converting to func pointer')
                 tinfo.create_ptr(tinfo)
             typename = idaapi.print_tinfo('', 0, 0, idaapi.PRTYPE_1LINE, tinfo, '', '')
-            self.logger.info('Applying tinfo: "%s"', str(typename))
+            logger.info('Applying tinfo: "%s"', str(typename))
             #both applying callee type & setting op type -> not sure if both are needed?
             # set op type causes change in hexrays decompilation
             # apply callee type updates ida's stack analysis
             ret = idaapi.apply_callee_tinfo(here, tinfo)
-            ret = idaapi.set_op_tinfo2(here, 0, tinfo)
-            self.logger.debug('set_op_tinfo2 result: %r', ret)
+            if using_ida7api:
+                ret = idaapi.set_op_tinfo(here, 0, tinfo)
+            else:
+                ret = idaapi.set_op_tinfo2(here, 0, tinfo)
+            logger.debug('set_op_tinfo2 result: %r', ret)
 
         except Exception, err:
-            self.logger.exception("Exception caught: %s", str(err))
+            logger.exception("Exception caught: %s", str(err))
 
 class ApplyCalleeTypeWidget(QtWidgets.QDialog):
     UNKNOWN_TYPE    = 0
@@ -293,37 +313,41 @@ class ApplyCalleeTypeWidget(QtWidgets.QDialog):
     def __init__(self, parent=None):
         QtWidgets.QDialog.__init__(self, parent)
         try:
-            self.logger = jayutils.getLogger('ApplyCalleeTypeWidget')
             self.tinfo = None
             self.inputType = self.USER_TYPE
-            self.logger.debug('ApplyCalleeTypeWidge starting up')
+            logger.debug('ApplyCalleeTypeWidge starting up')
             self.ui = Ui_ApplyCalleeDialog()
             self.ui.setupUi(self)
             self.ui.te_userTypeText.setTabChangesFocus(True)
             self.ui.pb_useStandardType.clicked.connect(self.onStandardPress)
             self.ui.pb_useLocalType.clicked.connect(self.onLocalPress)
         except Exception, err:
-            self.logger.exception('Error during init: %s', str(err))
+            logger.exception('Error during init: %s', str(err))
     
     def getUserText(self):
         return self.ui.te_userTypeText.toPlainText()
 
     def onLocalPress(self):
-        self.logger.debug('LOCAL_TYPE')
+        logger.debug('LOCAL_TYPE')
         self.inputType = self.LOCAL_TYPE
         self.accept()
 
     def onStandardPress(self):
-        self.logger.debug('STANDARD_TYPE')
+        logger.debug('STANDARD_TYPE')
         self.inputType = self.STANDARD_TYPE
         self.accept()
 
 
 def main():
-    logger = jayutils.configLogger('', logging.DEBUG)
-    #logger = jayutils.configLogger('', logging.INFO)
-    launcher = ApplyCalleeTypeRunner()
-    launcher.run()
+    try:
+        global logger
+        #logger = jayutils.configLogger(__name__, logging.DEBUG)
+        logger = jayutils.configLogger(__name__, logging.INFO)
+        launcher = ApplyCalleeTypeRunner()
+        launcher.run()
+    except Exception, err:
+        import traceback
+        print('Error in act: %s: %s' % (str(err), traceback.format_exc()))
 
 if __name__ == '__main__':
     main()

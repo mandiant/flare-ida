@@ -5,6 +5,7 @@
 ########################################################################
 # Copyright 2012 Mandiant
 # Copyright 2014 FireEye
+# Copyright 2019 FireEye
 #
 # Mandiant licenses this file to you under the Apache License, Version
 # 2.0 (the "License"); you may not use this file except in compliance with the
@@ -30,14 +31,26 @@ import idc
 import idautils  
 import idaapi
 
+idaapi.require('flare')
+idaapi.require('flare.stackstrings')
+
+PLUGIN_COMMENT = "This is a comment"
+PLUGIN_HELP = "This is help"
+PLUGIN_NAME = "StackStrings"
+PLUGIN_WANTED_HOTKEY = "Alt-0"
+
+# get the IDA version number
+ida_major, ida_minor = map(int, idaapi.get_kernel_version().split("."))
+using_ida7api = (ida_major > 6)
+ex_addmenu_item_ctx = None 
+
 
 class stackstrings_plugin_t(idaapi.plugin_t):
     flags = idaapi.PLUGIN_KEEP
-    comment = "This is a comment"
-
-    help = "This is help"
-    wanted_name = "StackStrings"
-    wanted_hotkey = "Alt-0"
+    comment = PLUGIN_COMMENT
+    help = PLUGIN_HELP
+    wanted_name = PLUGIN_NAME
+    wanted_hotkey = PLUGIN_WANTED_HOTKEY
 
     def init(self):
         try:
@@ -48,12 +61,9 @@ class stackstrings_plugin_t(idaapi.plugin_t):
         
         return idaapi.PLUGIN_SKIP
 
-
     def run(self, arg):
         try:
             idaapi.msg("StackStrings run() called with %d!\n" % arg)
-            idaapi.require('flare')
-            idaapi.require('flare.stackstrings')
             flare.stackstrings.main()
             idaapi.msg("StackStrings run() done")
         except Exception, err:
