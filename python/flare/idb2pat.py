@@ -257,11 +257,10 @@ def make_func_sig(config, func):
 
     sig += ".." * (32 - (len(sig) / 2))
 
-    loc = 32
     crc_data = [0 for i in zrange(256)]
     # for 255 bytes starting at index 32, or til end of function, or variable byte
-    for i in zrange(32, 32 + min(func.endEA - func.startEA, 255)):
-        if i in variable_bytes:
+    for loc in zrange(32, 32 + min(func.endEA - func.startEA, 256)):
+        if loc in variable_bytes:
             break
 
         crc_data[loc - 32] = get_byte(func.startEA + loc)
