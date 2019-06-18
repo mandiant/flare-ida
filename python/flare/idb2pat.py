@@ -257,18 +257,27 @@ def make_func_sig(config, func):
 
     sig += ".." * (32 - (len(sig) / 2))
 
-    crc_data = [0 for i in zrange(256)]
-    # for 255 bytes starting at index 32, or til end of function, or variable byte
-    for loc in zrange(32, 32 + min(func.endEA - func.startEA, 256)):
-        if loc in variable_bytes:
-            break
+    if func.endEA - func.startEA > 32:
+        crc_data = [0 for i in zrange(256)]
 
-        crc_data[loc - 32] = get_byte(func.startEA + loc)
+        # for 255 bytes starting at index 32, or til end of function, or variable byte
+        for loc in zrange(32, min(func.endEA - func.startEA, 32 + 255)):
+            if loc in variable_bytes:
+                break
 
-    # TODO: is this required everywhere? ie. with variable bytes?
-    alen = loc - 32
+            crc_data[loc - 32] = get_byte(func.startEA + loc)
+        else:
+            loc += 1
 
-    crc = crc16(to_bytestring(crc_data[:alen]), crc=0xFFFF)
+        # TODO: is this required everywhere? ie. with variable bytes?
+        alen = loc - 32
+
+        crc = crc16(to_bytestring(crc_data[:alen]), crc=0xFFFF)
+    else:
+        loc = func.endEA - func.startEA
+        alen = 0
+        crc = 0
+
     sig += " %02X" % (alen)
     sig += " %04X" % (crc)
     # TODO: does this need to change for 64bit?
@@ -300,9 +309,9 @@ def make_func_sig(config, func):
         sig += ref_format % (addr, name)
         
     # Tail of the module starts at the end of the CRC16 block.
-    if loc > 32 and loc < func.endEA:
+    if loc < func.endEA - func.startEA:
         tail = " "
-        for ea in xrange(func.startEA + loc, min(func.endEA, func.startEA + 0x8000)):
+        for ea in zrange(func.startEA + loc, min(func.endEA, func.startEA + 0x8000)):
             if ea in variable_bytes:
                 tail += ".."
             else:
