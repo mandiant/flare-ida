@@ -116,9 +116,9 @@ class Objc2Analyzer():
                     reg1 = None
                     reg2 = None
                     if regs[0] in eh.regs:
-                        reg1 = uc.reg_read(eh.regs[regs[0]])
+                        reg1 = eh.getRegVal(regs[0])
                     if regs[1] in eh.regs:
-                        reg2 = uc.reg_read(eh.regs[regs[1]])
+                        reg2 = eh.getRegVal(regs[1])
                     logging.debug("possible IVAR reference found @%s, reg1: %s reg2: %s" % (
                         eh.hexString(address), eh.hexString(reg1), eh.hexString(reg2)))
                     if type(reg1) is long and idc.get_name(reg1, idc.ida_name.GN_VISIBLE)[:13] == "_OBJC_IVAR_$_":
@@ -167,7 +167,7 @@ class Objc2Analyzer():
                     m = re.match(r"\[([^\,\]]+)\]", opnd)
                     if m:
                         opreg = m.group(1)
-                        opval = uc.reg_read(eh.regs[opreg])
+                        opval = eh.getRegVal(opreg)
                         if opval & self.magicMaskMask32 == self.magicMask32:
                             logging.debug("magic value found in %s @%s, storing %s" % (
                                 opreg, eh.hexString(address), eh.hexString(opval)))
@@ -183,7 +183,7 @@ class Objc2Analyzer():
                         mv = None
                         for i in range(1, 3):
                             if m.group(i) in eh.regs:
-                                regVal = uc.reg_read(eh.regs[m.group(i)])
+                                regVal = eh.getRegVal(m.group(i))
                                 if type(regVal) is long and regVal & self.magicMaskMask32 == self.magicMask32:
                                     # if both regs contain magic val, choose the ivar val over the self val
                                     if mv is None or (len(userData["magicVals"][regVal & 0xFFFF]) == 2 and
@@ -253,9 +253,9 @@ class Objc2Analyzer():
                     return
             # skip the ADD instructions with two operands for selrefs and magic vals
             elif (idc.print_insn_mnem(address)[:3] == "ADD" and opCnt == 2 and
-                    (idc.get_name(uc.reg_read(eh.regs[idc.print_operand(address, 0)]), 
+                    (idc.get_name(eh.getRegVal(idc.print_operand(address, 0)), 
                     idc.ida_name.GN_VISIBLE)[:7] == "selRef_" or 
-                    uc.reg_read(eh.regs[idc.print_operand(address, 0)]) & self.magicMaskMask32 == 
+                    eh.getRegVal(idc.print_operand(address, 0)) & self.magicMaskMask32 == 
                     self.magicMask32)):
                     
                 # if the 2nd operand is an ivar magic val overwrite the 1st reg with it
@@ -436,7 +436,7 @@ class Objc2Analyzer():
             # skip the ADD instructions with two operands for our magic values
             elif (idc.print_insn_mnem(address)[:3] == "ADD" and
                     opCnt == 2 and
-                    uc.reg_read(eh.regs[idc.print_operand(address, 0)]) & self.magicMaskMask64 == self.magicMask64):
+                    eh.getRegVal(idc.print_operand(address, 0)) & self.magicMaskMask64 == self.magicMask64):
                 eh.skipInstruction(userData)
                 return
             # look for ADD instructions that are adding registers and check each reg for pointing to magic val, store
@@ -451,7 +451,7 @@ class Objc2Analyzer():
                     if idc.get_operand_type(address, i) in [1, 8]:
                         reg = idc.print_operand(address, i)
                         if reg in eh.regs:
-                            regVal = uc.reg_read(eh.regs[reg])
+                            regVal = eh.getRegVal(reg)
                             if type(regVal) is long and regVal & self.magicMaskMask64 == self.magicMask64:
                                 # favor the ivar over the returned id or self id
                                 if mv is None or (len(userData["magicVals"][regVal & 0xFFFF]) == 2 and
@@ -663,8 +663,7 @@ class Objc2Analyzer():
                         idc.get_operand_type(address, 0) == 1):
                     self.processMsgSend(eh, address, id, selName, clsName,
                                    isInstance, selref, selXref, userData)
-                    idc.add_dref(address, eh.uc.reg_read(
-                        eh.regs[idc.print_operand(address, 0)]), idc.dr_I | idc.XREF_USER)
+                    idc.add_dref(address, eh.getRegVal(idc.print_operand(address, 0)), idc.dr_I | idc.XREF_USER)
                     logging.debug("found undiscovered msgSend xref@%s" %
                                   eh.hexString(address))
                     userData["msgSendXrefs"].append(address)
@@ -678,11 +677,10 @@ class Objc2Analyzer():
 
             # this call is one of those "call reg" instructions we thought might be a msgSend call, but wasn't sure
             if (address in userData["possibleMsgSendXrefs"] and idc.get_operand_type(address, 0) == 1 and "msgSend" in
-                    idc.get_name(eh.uc.reg_read(eh.regs[idc.print_operand(address, 0)]), idc.ida_name.GN_VISIBLE)):
+                    idc.get_name(eh.getRegVal(idc.print_operand(address, 0)), idc.ida_name.GN_VISIBLE)):
                 self.processMsgSend(eh, address, id, selName, clsName,
                                isInstance, selref, selXref, userData)
-                idc.add_dref(address, eh.uc.reg_read(
-                    eh.regs[idc.print_operand(address, 0)]), idc.dr_I | idc.XREF_USER)
+                idc.add_dref(address, eh.getRegVal(idc.print_operand(address, 0)), idc.dr_I | idc.XREF_USER)
                 logging.debug("found undiscovered msgSend xref@%s" %
                               eh.hexString(address))
             elif address in userData["msgSendXrefs"]:
@@ -1075,8 +1073,8 @@ class Objc2Analyzer():
         else:
             logging.debug("unsupported architecture, quitting..")
 
-        eh.iterate(targets, self.targetCallback, self.preEmuCallback,
-                   self.callHook, emuHook, userData, True)
+        eh.iterate(targets, self.targetCallback, preEmuCallback=self.preEmuCallback,
+                   callHook=self.callHook, instructionHook=emuHook, hookData=userData, resetEmuMem=True)
 
         # reload with patches
         eh.initEmuHelper()
@@ -1229,5 +1227,5 @@ class Objc2Analyzer():
             eh.uc.reg_write(eh.regs["arg1"], self_)
 
 
-if __name__ == '__main__': 
+if __name__ == '__main__':
     Objc2Analyzer()
