@@ -6,6 +6,8 @@
 import idc
 import idaapi
 import idautils
+import ida_xref
+import ida_bytes
 
 import mykutils
 from mykutils import phex
@@ -35,6 +37,10 @@ METAPC = 'metapc'
 ###############################################################################
 
 # Code Carving/Grafting
+
+g_seg_sig_code_grafter = 'Segment added by FLARE Code Grafter'
+g_patched_call_cmt = 'Patched for emulation, was:'
+g_cmt_pointed = '(Pointed'
 
 # Name tuple -> implementation lookup
 g_patch_pointer_width = {
@@ -83,6 +89,20 @@ g_fnbytes[METAPC][64]['strcpy'] = (
     '0fb6008801488b04240fbe08488b04244883c00148890424488b4424284883c0'
     '01488944242885c97402ebcb488b4424204883c418c3'
     )
+
+g_strlen_metapc_32bit = (
+    '558bec51c745fc000000008b45080fbe088b550883c20189550885c9740b8b45'
+    'fc83c0018945fcebe28b45fc8be55dc3'
+    )
+g_strlen_metapc_64bit = (
+    '48894c24084883ec1848c7042400000000488b4424200fbe08488b4424204883'
+    'c001488944242085c9740e488b04244883c00148890424ebd8488b04244883c4'
+    '18c3'
+    )
+
+# Covers lstrlenA
+g_fnbytes[METAPC][32]['strlen'] = g_strlen_metapc_32bit
+g_fnbytes[METAPC][64]['strlen'] = g_strlen_metapc_64bit
 
 g_retn0_metapc_64bit = '4831c0c3'
 g_retn1_metapc_64bit = '4831c04883c001c3'
@@ -437,6 +457,10 @@ class CodeGraftingDisplacementError(Exception):
     pass
 
 
+class CodeGraftingAlreadyPresent(Exception):
+    pass
+
+
 class Segment(namedtuple('Segment', 'start end')):
     """For reasoning over segments."""
 
@@ -556,10 +580,15 @@ class CodeGrafter():
 
         self._emu_stubs = {
             ('IsDebuggerPresent',): self.get_fnbytes('retn0'),
+            ('InitializeCriticalSectoin', 'EnterCriticalSection',
+             'LeaveCriticalSection', 'DeleteCriticalSection'):
+                self.get_fnbytes('retn0_1arg'),
             ('CreateThread',): self.get_fnbytes('retn1_6args'),
             ('free', '_free', '??3@YAXPAX@Z'): self.get_fnbytes('retn0'),
             ('HeapFree',): self.get_fnbytes('retn0_3args'),
             ('strcpy', '_strcpy'): self.get_fnbytes('strcpy'),
+            ('strlen',): self.get_fnbytes('strlen'),
+            ('lstrlenA',): self.get_fnbytes('strlen'),
             ('memcpy', '_memcpy'): self.get_fnbytes('memcpy'),
             ('memset', '_memset'): self.get_fnbytes('memset'),
         }
@@ -597,8 +626,25 @@ class CodeGrafter():
                 implementation that supports free(), this unfortunately has to
                 be pretty sizeable in practice.
         """
+        if self._findGraftedSegments():
+            msg = ('Found grafted code segments; use '
+                   'removeGraftedCodeFromIdb() first if you want to graft '
+                   'anew')
+            raise CodeGraftingAlreadyPresent(msg)
         self._addSegments(mem)
         return self._patchCalls()
+
+    def removeGraftedCodeFromIdb(self):
+        grafted = self._findGraftedSegments()
+        if grafted:
+            self._unpatchCalls(grafted)
+
+        for seg in grafted:
+            idc.del_segm(seg.start, idc.SEGMOD_KILL)
+
+    def _findGraftedSegments(self):
+        return [s for s in SegPlanner() if
+                idc.RptCmt(s.start) == g_seg_sig_code_grafter]
 
     def _addSegments(self, mem=0x4000000):
         """Create emulation stub segments.
@@ -638,6 +684,7 @@ class CodeGrafter():
 
         for seg in (code, arena):
             idc.AddSeg(seg.start, seg.end, 0, use32, 0, idc.scPub)
+            idc.MakeRptCmt(seg.start, g_seg_sig_code_grafter)
 
         # Designate location for the malloc "arena"
         va_arena = arena.start
@@ -686,19 +733,46 @@ class CodeGrafter():
                 add_stub_func(va_next_code, sc, nm)
                 va_next_code = next_addr_align4(va_next_code, sc)
 
+    def _get_imp_for_register_call(self, va_call, nm=None):
+        if idc.GetMnem(va_call) != 'call':
+            msg = 'va_call must be the virtual address of a call instruction'
+            raise ValueError(msg)
+
+        reg = idc.GetOpnd(va_call, 0)
+        va_mov = mykutils.find_instr(va_call, 'up', 'mov',
+                                     [(0, 1, reg), (1, 2, None)])
+        if not va_mov:
+            return None
+
+        if nm and (nm not in idc.GetOpnd(va_mov, 1)):
+            return None
+
+        va_imp = idc.GetOperandValue(va_mov, 1)
+        return va_imp
+
     def _patchCalls(self):
         def do_patch_call(va):
+            retval = False
             stub_loc = idc.LocByName(self._stubname(nm))
 
             # Preserve original disassembly and format new comment
             old_target = idc.GetOpnd(va, 0)
             orig_cmt = idc.Comment(va) or ''
-            new_cmt = 'Patched for emulation, was:\n\t%s' % (idc.GetDisasm(va))
+            new_cmt = '%s\n\t%s' % (g_patched_call_cmt, idc.GetDisasm(va))
 
-            if idc.GetOpType(va, 0) == 2:
+            if idc.GetOpType(va, 0) == 2:  # e.g. call ds:HeapAlloc
                 retval = patch_import(va, self._stubname(nm))
-                new_cmt += '\n(Pointed %s to %s)' % (old_target,
+                new_cmt += '\n%s %s to %s)' % (g_cmt_pointed, old_target,
                                                      self._stubname(nm))
+            elif idc.GetOpType(va, 0) == 1:  # e.g. call ebx ; HeapAlloc
+                va_imp = self._get_imp_for_register_call(va, nm)
+                if va_imp:
+                    patch_pointer_width(va_imp, stub_loc)
+                    retval = True
+                else:
+                    logger.warn('Could not find import to patch call at %s' %
+                                (phex(va)))
+
             else:  # Usually optype 7 otherwise
                 # Won't work if displacement exceeds 32-bit operand size
                 call_offset_loc = va + idc.ItemSize(va)
@@ -712,6 +786,7 @@ class CodeGrafter():
                 if orig_cmt:
                     new_cmt += '\n%s' % (orig_cmt)
                 idc.MakeComm(va, new_cmt)
+                ida_xref.add_cref(va, stub_loc, ida_xref.fl_CN)
 
             return retval
 
@@ -725,6 +800,46 @@ class CodeGrafter():
                 # do_patch_call closure will turn <nm> into stub_<nm>
                 mykutils.for_each_call_to(do_patch_call, idc.LocByName(alias))
 
+    def _unpatchCalls(self, grafted_segs):
+        def do_unpatch_call(va_callsite):
+            size = idc.ItemSize(va_callsite)
+            ida_xref.del_cref(va_callsite, fva_stub, 0)
+            cmt = idc.Comment(va_callsite)
+
+            newcmt = cmt
+
+            # Remove automated comments
+            if newcmt.startswith(g_patched_call_cmt):
+                newcmt = newcmt[newcmt.find('\n') + 1:]
+                if newcmt.find('\n') == -1:
+                    newcmt = ''
+                else:
+                    newcmt = newcmt[newcmt.find('\n') + 1:]
+                if newcmt.startswith(g_cmt_pointed):
+                    if newcmt.find('\n') == -1:
+                        newcmt = ''
+                    else:
+                        newcmt = newcmt[newcmt.find('\n') + 1:]
+
+            if newcmt != cmt:
+                idc.MakeComm(va_callsite, newcmt)
+                
+            if idc.GetOpType(va_callsite, 0) == 2:
+                patch_import(va_callsite, idc.BADADDR)
+            elif idc.GetOpType(va_callsite, 0) == 1:
+                va_imp = self._get_imp_for_register_call(va_callsite)
+                if va_imp:
+                    patch_pointer_width(va_imp, idc.BADADDR)
+            else:
+                revert_patch(va_callsite, size)
+
+            print('Unpatched %d-byte call at va %s' % (size, phex(va_callsite)))
+
+        for fva_stub in idautils.Functions():
+            for seg in grafted_segs:
+                if fva_stub in seg:
+                    mykutils.for_each_call_to(do_unpatch_call, fva_stub)
+
 
 def align(n, a):
     return n + (a - 1) & ~(a - 1)
@@ -734,12 +849,12 @@ def patch_pointer_width(va, value):
     g_patch_pointer_width[mykutils.get_bitness()](va, value)
 
 
-def patch_import(va, new_nm):
-    """Patch the import corresponding to the call at @va to point to @new_nm.
+def patch_import(va, target):
+    """Patch the import corresponding to the call at @va to point to @target.
 
     Args:
         va (numbers.Integral): Address of call site for imported function
-        new_nm (str): Name of new call destination for import entry
+        target (str): Name or address of new call destination for import entry
 
     Returns:
         bool: True if successful
@@ -752,7 +867,10 @@ def patch_import(va, new_nm):
         logger.warn('Not a call instruction at %s' % (phex(va)))
         return False
 
-    patch_pointer_width(idc.GetOperandValue(va, opno), idc.LocByName(new_nm))
+    if isinstance(target, basestring):
+        target = idc.LocByName(target)
+
+    patch_pointer_width(idc.GetOperandValue(va, opno), target)
 
     return True
 
@@ -802,3 +920,25 @@ def patch_call(va, new_nm):
     idaapi.patch_many_bytes(va, code)
 
     return True
+
+def revert_patch(va, nr):
+    """Unpatch the opcodes at @va, reverting them to their original value.
+
+    Args:
+        va (numbers.Integral): Address of the location of the patch to revert
+        nr (numbers.Integral): Number of bytes to scan and revert
+
+    Returns:
+        bool: True if patched bytes were restored
+    """
+    ret = False
+
+    orig = [ida_bytes.get_original_byte(va + i) for i in range(nr)]
+    current = [idc.Byte(va + i) for i in range(nr)]
+
+    for i in range(len(orig)):
+        if orig[i] != current[i]:
+            ret = True
+            idaapi.patch_byte(va + i, orig[i])
+
+    return ret
