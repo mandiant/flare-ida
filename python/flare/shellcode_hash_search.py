@@ -189,6 +189,10 @@ class DbStore(object):
         List is empty for no hits
         '''
         retList = []
+        # Quick n dirty fix for overlong ints for SQLite
+        if hashVal>=0xffffffff:
+            hashVal &= 0x00000000ffffffff
+            
         cur = self.conn.execute(sql_lookup_hash_type_value, (hashVal, hashType))
         for row in cur:
             #logger.debug("Found hits for value: %08x", hashVal)
