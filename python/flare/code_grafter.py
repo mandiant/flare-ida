@@ -11,13 +11,11 @@ import ida_bytes
 
 import mykutils
 from mykutils import phex
+from seghelper import SegPlanner
 
-import array
-import bisect
 import struct
 import logging
 import binascii
-from collections import namedtuple
 
 __author__ = 'Michael Bailey'
 __copyright__ = 'Copyright (C) 2019 FireEye, Inc.'
@@ -461,111 +459,6 @@ class CodeGraftingAlreadyPresent(Exception):
     pass
 
 
-class Segment(namedtuple('Segment', 'start end')):
-    """For reasoning over segments."""
-
-    def __repr__(self):
-        return 'Segment(start=%s, end=%s)' % (phex(self.start), phex(self.end))
-
-    def __contains__(self, item):
-        if isinstance(item, Segment):
-            return self._contains_segment(item)
-        return self._contains_va(item)
-
-    def _contains_segment(self, some_seg):
-        return ((self.start in some_seg) or ((self.end - 1) in some_seg) or
-                (some_seg.start in self) or ((some_seg.end - 1) in self))
-
-    def __lt__(self, va_or_seg):
-        if isinstance(va_or_seg, Segment):
-            return self.start < va_or_seg.start
-        return self.start < va_or_seg
-
-    def _contains_va(self, va):
-        return va >= self.start and va < self.end
-
-
-class SegPlanner():
-    """For planning (but not implementing) where to add segments."""
-
-    def __init__(self):
-        self._segs = [Segment(va, idc.SegEnd(va)) for va in idautils.Segments()]
-        self._segs.sort()
-
-    def __iter__(self):
-        return iter(self._segs)
-
-    def __contains__(self, va_or_seg):
-        try:
-            self[va_or_seg]
-        except LookupError:
-            return False
-        return True
-
-    def __getitem__(self, va_or_seg):
-        for seg in self._segs:
-            if va_or_seg in seg:
-                return seg
-        raise IndexError('virtual address not in any range')
-
-    def addSeg(self, size, aligned4k=True):
-        """Add a segment to the planner (but not to the IDB).
-
-        This structure is for planning purposes when adding multiple segments.
-        After planning is complete, you must actually add the segments, such as
-        by calling `idc.AddSeg`. Example:
-            idc.AddSeg(seg.start, seg.end, 0, 1, 0, idc.scPub)
-        """
-        seg = self.findAvailableSegment(size, aligned4k)
-
-        if seg:
-            bisect.insort(self._segs, seg)
-
-        return seg
-
-    def findAvailableSegment(self, size, aligned4k=True):
-        """Find space for segments as near as possible to existing segments.
-
-        This affinity stands to decrease the offset between code and call
-        targets, allowing five-byte E8 call instructions to be patched in where
-        a greater distance might result in failure e.g. for a 64-bit address
-        space. In case of severe fragmentation, three strategies are employed:
-            1. Attempt to insert after existing segments
-            2. Attempt to insert before existing segments
-            3. Attempt to insert near the bottom of memory (yuck)
-        """
-        va_bottom = 0x10000  # Avoid NULL page and Bochs loader segment
-
-        # First, try to come after an existing segment
-        for seg in self:
-            va_start = seg.end
-            if aligned4k:
-                va_start = ((va_start - 1) | 0xfff) + 1
-
-            tryseg = Segment(va_start, va_start + size)
-            if tryseg not in self:
-                return tryseg
-
-        # Failing that, aim for before each existing segment
-        for seg in self:
-            va_start = seg.start - size
-            if aligned4k:
-                va_start = va_start & 0xfffffffffffff000
-            tryseg = Segment(va_start, va_start + size)
-            if tryseg not in self:
-                return tryseg
-
-        # Worst case, try for the bottom of memory
-        tryseg = Segment(va_bottom, va_bottom + size)
-        if tryseg not in self:
-            return tryseg
-
-        return None
-
-    def __repr__(self):
-        return '%r' % (self._segs)
-
-
 class CodeGrafter():
     """Graft code into IDA database to allow emulation of functions that call
     certain imports and memory allocators.
@@ -679,8 +572,8 @@ class CodeGrafter():
         # Note 2: SegPlanner ensures segments won't start at 0, which otherwise
         # could result in a NULL return from an allocator stub like malloc
         # erroneously signifying failure.
-        code = seg_plan.addSeg(code_seg_size)
-        arena = seg_plan.addSeg(arena_seg_size)
+        code = seg_plan.addSegAnywhere(code_seg_size)
+        arena = seg_plan.addSegAnywhere(arena_seg_size)
 
         for seg in (code, arena):
             idc.AddSeg(seg.start, seg.end, 0, use32, 0, idc.scPub)
@@ -706,7 +599,7 @@ class CodeGrafter():
         va_next_code = code.start + 0x10
 
         def next_addr_align4(base, sc):
-            return align(base + (len(sc) / 2), 4)
+            return mykutils.align(base + (len(sc) / 2), 4)
 
         def add_stub_func(va, sc, nm):
             idaapi.patch_many_bytes(va, binascii.unhexlify(sc))
@@ -763,7 +656,7 @@ class CodeGrafter():
             if idc.GetOpType(va, 0) == 2:  # e.g. call ds:HeapAlloc
                 retval = patch_import(va, self._stubname(nm))
                 new_cmt += '\n%s %s to %s)' % (g_cmt_pointed, old_target,
-                                                     self._stubname(nm))
+                                               self._stubname(nm))
             elif idc.GetOpType(va, 0) == 1:  # e.g. call ebx ; HeapAlloc
                 va_imp = self._get_imp_for_register_call(va, nm)
                 if va_imp:
@@ -823,7 +716,7 @@ class CodeGrafter():
 
             if newcmt != cmt:
                 idc.MakeComm(va_callsite, newcmt)
-                
+
             if idc.GetOpType(va_callsite, 0) == 2:
                 patch_import(va_callsite, idc.BADADDR)
             elif idc.GetOpType(va_callsite, 0) == 1:
@@ -833,16 +726,10 @@ class CodeGrafter():
             else:
                 revert_patch(va_callsite, size)
 
-            print('Unpatched %d-byte call at va %s' % (size, phex(va_callsite)))
-
         for fva_stub in idautils.Functions():
             for seg in grafted_segs:
                 if fva_stub in seg:
                     mykutils.for_each_call_to(do_unpatch_call, fva_stub)
-
-
-def align(n, a):
-    return n + (a - 1) & ~(a - 1)
 
 
 def patch_pointer_width(va, value):
@@ -920,6 +807,7 @@ def patch_call(va, new_nm):
     idaapi.patch_many_bytes(va, code)
 
     return True
+
 
 def revert_patch(va, nr):
     """Unpatch the opcodes at @va, reverting them to their original value.

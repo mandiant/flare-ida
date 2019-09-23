@@ -41,6 +41,25 @@ def phex(n):
     return hex(n).rstrip('L')
 
 
+def align(n, a):
+    """Align @n to @a bytes.
+
+    Examples:
+        align(4, 4) = 4
+        align(3, 4) = 4
+        align(0, 4) = 0
+        align(5, 4) = 8
+
+    Args:
+        n (numbers.Integral): Virtual address to align
+        a (numbers.Integral): Alignment
+
+    Returns:
+        New, aligned address, or @n if already @a-byte aligned.
+    """
+    return (n + (a - 1)) & ~(a - 1)
+
+
 def get_bitness():
     """Get the architecture bit width of this IDB."""
     inf = idaapi.get_inf_structure()
@@ -67,7 +86,10 @@ def for_each_call_to(callback, va=None):
     for va in callsites:
         callback(va)
 
+
+# Instruction operand specification
 OpSpec = namedtuple('OpSpec', 'pos type name')
+
 
 def find_instr(va_start, direction, mnems=None, op_specs=[], max_instrs=0):
     """Find an instruction in the current function conforming to the
@@ -105,7 +127,7 @@ def find_instr(va_start, direction, mnems=None, op_specs=[], max_instrs=0):
     if va_start and (not isinstance(va_start, numbers.Integral)):
         raise ValueError('Invalid va_start')
 
-    va = va_start or here()
+    va = va_start or idc.here()
 
     if not max_instrs:
         max_instrs = 9999
@@ -131,6 +153,7 @@ def find_instr(va_start, direction, mnems=None, op_specs=[], max_instrs=0):
             break
 
     return None
+
 
 def is_conformant_instr(va, mnems, op_specs):
     """Check if instruction at @va conforms to operand specifications list.
@@ -164,6 +187,7 @@ def is_conformant_instr(va, mnems, op_specs):
             return False
 
     return True
+
 
 def is_conformant_operand(va, op_spec):
     """Check that operand conforms to specification.
@@ -211,4 +235,3 @@ def is_conformant_operand(va, op_spec):
                 return False
 
     return True
-
