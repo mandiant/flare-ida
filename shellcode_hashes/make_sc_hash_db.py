@@ -805,21 +805,6 @@ for c in input_string {
 acc := ROL(acc, 5);
 '''
 
-def or60hAddShl1Hash32(inString,fName):
-    if inString is None:
-        return 0
-    val = 0
-    for i in inString:
-        val += ord(i) | 96
-        val = val << 1
-    return val
-
-pseudocode_or60hAddShl1Hash32 = '''acc := 0;
-for c in input_string {
-   acc := acc | 60h;
-   acc := acc << 1;
-}
-'''
 
 def or21hXorRor11Hash32(inString,fName):
     if inString is None:
@@ -1087,7 +1072,6 @@ HASH_TYPES = [
     ('xorShr8Hash32',       32, pseudocode_xorShr8Hash32),
     ('imul83hAdd',          32, pseudocode_imul83hAdd),
     ('imul21hAddHash32',          32, pseudocode_imul21hAddHash32),
-    ('or60hAddShl1Hash32',          32, pseudocode_or60hAddShl1Hash32),
     ('or21hXorRor11Hash32',          32, pseudocode_or21hXorRor11Hash32),
     ('or23hXorRor17Hash32',          32, pseudocode_or23hXorRor17Hash32),
     ('playWith0xe8677835Hash', 32, pseudocode_playWith0xe8677835Hash),
@@ -1254,13 +1238,13 @@ class ShellcodeDbCreator(object):
         #    type(libKey), str(libKey),
         #    type(symbolName), str(symbolName))
         cur = self.conn.execute(sql_find_symbol_hash_type_lib_symbol, 
-            (hashVal, hashType, libKey, symbolName)
+            (ctypes.c_int64(hashVal).value, hashType, libKey, symbolName)
         )
         retList = cur.fetchall()
         if len(retList) == 0:
             #insert it now
             cur = self.conn.execute(sql_add_symbol_hash, 
-                (hashVal, hashType, libKey, symbolName)
+                (ctypes.c_int64(hashVal).value, hashType, libKey, symbolName)
             )
             if cur is None:
                 raise RuntimeError("Cursor is None following symbol hash insert")
