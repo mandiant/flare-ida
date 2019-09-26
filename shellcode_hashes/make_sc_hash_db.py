@@ -1260,7 +1260,7 @@ class ShellcodeDbCreator(object):
         if len(retList) == 0:
             #insert it now
             cur = self.conn.execute(sql_add_symbol_hash, 
-                (hashVal, hashType, libKey, symbolName)
+                (ctypes.c_int64(hashVal).value, hashType, libKey, symbolName)
             )
             if cur is None:
                 raise RuntimeError("Cursor is None following symbol hash insert")

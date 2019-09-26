@@ -25,6 +25,7 @@
 ########################################################################
 
 import sys
+import ctypes
 import logging
 import os.path
 import sqlite3
@@ -166,7 +167,7 @@ class DbStore(object):
         List is empty for no hits
         '''
         retList = []
-        cur = self.conn.execute(sql_lookup_hash_value, (hashVal,))
+        cur = self.conn.execute(sql_lookup_hash_value, (ctypes.c_int64(hashVal).value,))
         for row in cur:
             #logger.debug("Found hits for value: %08x", hashVal)
             sym = SymbolHash(*row)
@@ -189,7 +190,7 @@ class DbStore(object):
         List is empty for no hits
         '''
         retList = []
-        cur = self.conn.execute(sql_lookup_hash_type_value, (hashVal, hashType))
+        cur = self.conn.execute(sql_lookup_hash_type_value, (ctypes.c_int64(hashVal).value, hashType))
         for row in cur:
             #logger.debug("Found hits for value: %08x", hashVal)
             sym = SymbolHash(*row)
