@@ -5,6 +5,7 @@
 ########################################################################
 # Copyright 2012 Mandiant
 # Copyright 2014 FireEye
+# Copyright 2019 FireEye
 #
 # Mandiant licenses this file to you under the Apache License, Version
 # 2.0 (the "License"); you may not use this file except in compliance with the
@@ -28,27 +29,24 @@ import idc
 import idautils  
 import idaapi
 
+idaapi.require('flare')
+idaapi.require('flare.shellcode_hash_search')
+
 class shellcode_search_plugin_t(idaapi.plugin_t):
     flags = idaapi.PLUGIN_UNL
     comment = "This is a comment"
 
     help = "This is help"
     wanted_name = "Shellcode Hashes"
-    #wanted_hotkey = "Alt-F8"
     wanted_hotkey = ""
 
     def init(self):
-        #idaapi.msg("Shellcode Hashes init() called!\n")
         return idaapi.PLUGIN_OK
 
     def run(self, arg):
-        #idaapi.msg("Shellcode Hashes run() called with %d!\n" % arg)
-        idaapi.require('flare')
-        idaapi.require('flare.shellcode_hash_search')
         flare.shellcode_hash_search.main()
 
     def term(self):
-        #idaapi.msg("Shellcode Hashes term() called!\n")
         pass
 
 def PLUGIN_ENTRY():

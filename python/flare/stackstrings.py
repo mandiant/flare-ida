@@ -34,6 +34,7 @@ import logging
 import binascii
 
 import idc
+import idaapi
 import idautils
 
 import jayutils
@@ -45,6 +46,11 @@ try:
 except Exception, err:
     print 'Error importing stuff!'
     raise
+
+# get the IDA version number
+ida_major, ida_minor = map(int, idaapi.get_kernel_version().split("."))
+using_ida7api = (ida_major > 6)
+
 
 #TODO: make option for binary buffers on the stack also?
 def stack_track_visitor(node, **kwargs):
@@ -218,6 +224,8 @@ def runStrings(vw, ea, uselocalagg=True):
         return agg.stringDict.values()
 
 def getFuncRanges(ea, doAllFuncs):
+    if using_ida7api:
+        return getFuncRanges_ida7(ea, doAllFuncs)
     if doAllFuncs:
         funcs = []
         funcGen = idautils.Functions(idc.SegStart(ea), idc.SegEnd(ea))
@@ -233,14 +241,32 @@ def getFuncRanges(ea, doAllFuncs):
         fakeRanges = [( idc.GetFunctionAttr(idc.here(), idc.FUNCATTR_START), idc.GetFunctionAttr(idc.here(), idc.FUNCATTR_END)), ]
         return fakeRanges
 
+
+def getFuncRanges_ida7(ea, doAllFuncs):
+    if doAllFuncs:
+        funcs = []
+        funcGen = idautils.Functions(idc.get_segm_start(ea), idc.get_segm_end(ea))
+        for i in funcGen:
+            funcs.append(i)
+        funcRanges = []
+        for i in range(len(funcs) - 1):
+            funcRanges.append( (funcs[i], funcs[i+1]) )
+        funcRanges.append( (funcs[-1], idc.get_segm_end(ea)) )
+        return funcRanges
+    else:
+        #just get the range of the current function
+        fakeRanges = [( idc.get_func_attr(idc.here(), idc.FUNCATTR_START), idc.get_func_attr(idc.here(), idc.FUNCATTR_END)), ]
+        return fakeRanges
+
+
 def isLikelyFalsePositiveString(instr):
     #if a string is all 'A' chars, very likely that it's a false positive
     return all([a == 'A' for a in instr])
 
 def main(doAllFuncs=True):
     #doAllFuncs=False
-    #jayutils.configLogger('', logging.DEBUG)
-    jayutils.configLogger('', logging.INFO)
+    #jayutils.configLogger(__name__, logging.DEBUG)
+    jayutils.configLogger(__name__, logging.INFO)
     logger = jayutils.getLogger('stackstrings')
     logger.debug('Starting up now')
     filePath = jayutils.getInputFilepath()
@@ -248,9 +274,13 @@ def main(doAllFuncs=True):
         self.logger.info('No input file provided. Stopping')
         return
     vw = jayutils.loadWorkspace(filePath)
-    ea = idc.ScreenEA()
-    res = idc.AskYN(0, 'Use basic-block local aggregator')
-    if res == -1:
+    ea = idc.here()
+    res = -1
+    if using_ida7api:
+        res = idc.ask_yn(0, 'Use basic-block local aggregator')
+    else:
+        res = idc.AskYN(0, 'Use basic-block local aggregator')
+    if res == idaapi.ASKBTN_CANCEL:
         print 'User canceled'
         return
     uselocalagg = (res == 1)
@@ -265,8 +295,10 @@ def main(doAllFuncs=True):
                     continue
                 print '0x%08x: %s' % (node[0], string)
                 #print '0x%08x: 0x%08x: %s %s' % (node[0], node[1], binascii.hexlify(string), string)
-                idc.MakeComm(node[0], string.strip())
-     
+                if using_ida7api:
+                    idc.set_cmt(node[0], string.strip(), 0)
+                else:
+                    idc.MakeComm(node[0], string.strip())
         except Exception, err:
             logger.exception('Error during parse: %s', str(err))
     logger.info("\nDone With function stacks. Starting globals now")

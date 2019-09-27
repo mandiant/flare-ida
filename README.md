@@ -68,3 +68,7 @@ https://www.fireeye.com/blog/threat-research/2015/11/flare_ida_pro_script.html
 
 ### objc2_analyzer ###
 This script creates cross-references between selector references and their implementations as defined in the Objective-C  runtime related sections of the target Mach-O executable. It also patches selector reference pointers to instead point to their implementation function. This makes analysis of Objective-C code easier by enabling smooth transitions between an implementation and the locations where its selector is referenced throughout the code. Helpful Objective-C code comments are added to each call to objc_msgSend variants to clearly indicate which method is being called on which class.
+
+
+### ironstrings ###
+`ironstrings.py` is an IDAPython script that uses code emulation to recover constructed strings (stackstrings) from malware. Please see the details in the script's [README](https://github.com/fireeye/flare-ida/blob/master/python/flare/ironstrings/README.md).

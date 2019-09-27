@@ -4,7 +4,7 @@
 # 
 ########################################################################
 # Copyright 2012 Mandiant
-# Copyright 2014 FireEye
+# Copyright 2014,2018 FireEye
 #
 # Mandiant licenses this file to you under the Apache License, Version
 # 2.0 (the "License"); you may not use this file except in compliance with the
@@ -25,6 +25,7 @@
 ########################################################################
 
 import sys
+import ctypes
 import logging
 import os.path
 import sqlite3
@@ -42,6 +43,14 @@ try:
 except ImportError:
     print 'Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PyQt5 build available at \n"http://hex-rays.com/products/ida/support/download.shtml"'
     QT_AVAILABLE = False
+
+
+# get the IDA version number
+ida_major, ida_minor = map(int, idaapi.get_kernel_version().split("."))
+using_ida7api = (ida_major > 6)
+
+#logger = jayutils.configLogger('shellcode_hash', logging.DEBUG)
+logger = jayutils.configLogger('shellcode_hash', logging.INFO)
 
 class RejectionException(Exception):
     pass
@@ -158,9 +167,9 @@ class DbStore(object):
         List is empty for no hits
         '''
         retList = []
-        cur = self.conn.execute(sql_lookup_hash_value, (hashVal,))
+        cur = self.conn.execute(sql_lookup_hash_value, (ctypes.c_int64(hashVal).value,))
         for row in cur:
-            #self.logger.debug("Found hits for value: %08x", hashVal)
+            #logger.debug("Found hits for value: %08x", hashVal)
             sym = SymbolHash(*row)
             retList.append(sym)
         return retList
@@ -181,9 +190,9 @@ class DbStore(object):
         List is empty for no hits
         '''
         retList = []
-        cur = self.conn.execute(sql_lookup_hash_type_value, (hashVal, hashType))
+        cur = self.conn.execute(sql_lookup_hash_type_value, (ctypes.c_int64(hashVal).value, hashType))
         for row in cur:
-            #self.logger.debug("Found hits for value: %08x", hashVal)
+            #logger.debug("Found hits for value: %08x", hashVal)
             sym = SymbolHash(*row)
             retList.append(sym)
         return retList
@@ -202,8 +211,12 @@ class SearchParams(object):
         self.createStruct = False
 
         #startAddr & endAddr: range to process
-        self.startAddr = idc.SelStart()
-        self.endAddr = idc.SelEnd()
+        if using_ida7api:
+            self.startAddr = idc.read_selection_start()
+            self.endAddr = idc.read_selection_end()
+        else:
+            self.startAddr = idc.SelStart()
+            self.endAddr = idc.SelEnd()
 
         #hashTypes: list of HashTypes user confirmed to process
         self.hashTypes = []
@@ -213,21 +226,32 @@ class SearchParams(object):
 ############################################################
 
 class ShellcodeHashSearcher(object):
-    PTR_SIZE = 4
     def __init__(self, dbstore, params):
-        self.logger = jayutils.getLogger('ShellcodeHashSearcher')
         self.dbstore = dbstore
         self.params = params
         self.hits = []
+        self.hitSet = set()
+        self.ptrSize = jayutils.getx86CodeSize()/ 8
+        logger.debug('Using pointer size: %d bytes', self.ptrSize)
+
+    def addHit(self, ea, sym):
+        if ea in self.hitSet:
+            return
+        self.hits.append(HashHit(ea, sym))
+        self.hitSet.add( ea )
 
     def processCode(self):
         if (self.params.startAddr==idc.BADADDR) and (self.params.endAddr==idc.BADADDR):
-            self.logger.info('Processing current segment only')
-            #self.processAllSegments()
-            self.params.startAddr = idc.SegStart(idc.here())
-            self.params.endAddr = idc.SegEnd(idc.here())
+
+            if using_ida7api:
+                self.params.startAddr = idc.get_segm_start(idc.here())
+                self.params.endAddr = idc.get_segm_end(idc.here())
+            else:
+                self.params.startAddr = idc.SegStart(idc.here())
+                self.params.endAddr = idc.SegEnd(idc.here())
+            logger.info('Processing current segment only: 0x%08x - 0x%08x', self.params.startAddr, self.params.endAddr)
         else:
-            self.logger.info('Processing range 0x%08x - 0x%08x', self.params.startAddr, self.params.endAddr)
+            logger.info('Processing range 0x%08x - 0x%08x', self.params.startAddr, self.params.endAddr)
         if self.params.searchDwordArray:
             self.lookForDwordArray(self.params.startAddr, self.params.endAddr)
         if self.params.searchPushArgs:
@@ -235,89 +259,117 @@ class ShellcodeHashSearcher(object):
 
     def processAllSegments(self):
         for seg in idautils.Segments():
-            segStart = idc.SegStart(seg)
-            segEnd = idc.SegEnd(seg)
+            if using_ida7api:
+                segStart = idc.get_segm_start(seg)
+                segEnd = idc.get_segm_end(seg)
+            else:
+                segStart = idc.SegStart(seg)
+                segEnd = idc.SegEnd(seg)
+
             if self.params.searchPushArgs:
                 self.lookForOpArgs(segStart, segEnd)
             if self.params.searchDwordArray:
                 self.lookForDwordArray(segStart, segEnd)
 
     def run(self):
+        logger.info('Starting up')
         self.processCode()
         if self.params.createStruct:
             self.postProcessHits()
         else:
-            self.logger.debug('Skipping create struct')
+            logger.debug('Skipping create struct')
         self.dbstore.close()
+        logger.info('Done')
 
     def postProcessHits(self):
         '''
         For any consecutive locations of shellocode hits, creates a struct to 
         use as a function pointer table.
         '''
-        self.logger.debug("Starting postProcessHits")
+        logger.debug("Starting postProcessHits")
         self.hits.sort(key=lambda x: x.ea)
         count = 0
         start = 0
+        for idx, hit in enumerate(self.hits):
+            logger.debug('hits[%d]: %08x', idx, hit.ea)
         while start < (len(self.hits)-1):
             prev = start
             curr = start+1
-            while ((curr < len(self.hits)) and (self.hits[curr].ea == (self.hits[prev].ea+self.PTR_SIZE))):
-                prev = curr
-                curr = prev+1
+            while ((curr < len(self.hits)) and (self.hits[curr].ea == (self.hits[prev].ea+self.ptrSize))):
+                logger.debug('Yes, curr self.hits[%d].ea: %08x, prev self.hits[%d]: %08x', curr, self.hits[curr].ea, prev, self.hits[prev].ea)
+                curr, prev = (curr + 1, curr)
             #check if more than 2 consecutive hits, if so: make a struct
             if start != prev:
+                logger.debug('Making struct for start: %d - %d', start, curr)
                 self.makeStructFromHits(count, start, curr)
                 count += 1
             #advance to next section
             start = curr
-        self.logger.debug("Finishing postProcessHits")
+        logger.debug("Finishing postProcessHits")
 
     def makeStructFromHits(self, count, startHitIdx, endHitIdx):
         structName = 'sc%d' % count
-        self.logger.debug("Making struct %d:", count)
+        logger.debug("Making struct %d:", count)
 
-        structId = idc.AddStrucEx(0xffffffff, structName, 0)
+        if using_ida7api:
+            structId = idc.add_struc(0xffffffff, structName, 0)
+        else:
+            structId = idc.AddStrucEx(0xffffffff, structName, 0)
         if structId == 0xffffffff:
             raise ValueError("Struct %s already exists!" % structName)
         subRange = self.hits[startHitIdx:endHitIdx]
         for i in range(len(subRange)):
             hit = subRange[i]
-            self.logger.debug("%02x: %08x: %08x %s" , i*self.PTR_SIZE, hit.ea, hit.symHash.hashVal, hit.symHash.symbolName)
-            idc.AddStrucMember(structId, str(hit.symHash.symbolName), i*self.PTR_SIZE, idc.FF_DATA|idc.FF_DWRD, -1, 4)
+            logger.debug("%02x: %08x: %08x %s" , i*self.ptrSize, hit.ea, hit.symHash.hashVal, hit.symHash.symbolName)
+            if using_ida7api:
+                idc.add_struc_member(structId, str(hit.symHash.symbolName), i*self.ptrSize, idc.FF_DATA|idc.FF_DWORD, -1, 4)
+            else:
+                idc.AddStrucMember(structId, str(hit.symHash.symbolName), i*self.ptrSize, idc.FF_DATA|idc.FF_DWRD, -1, 4)
 
     def lookForOpArgs(self, start, end):
         for head in idautils.Heads(start, end):
             try:
                 for i in range(2):
-                    t = idc.GetOpType(head, i)
+                    if using_ida7api:
+                        t = idc.get_operand_type(head, i)
+                    else:
+                        t = idc.GetOpType(head, i)
                     if t == idc.o_imm:
-                        opval = idc.GetOperandValue(head, i)
+                        if using_ida7api:
+                            opval = idc.get_operand_value(head, i)
+                        else:
+                            opval = idc.GetOperandValue(head, i)
                         for h in self.params.hashTypes:
                             hits = self.dbstore.getSymbolByTypeHash(h.hashType, opval)
                             for sym in hits:
-                                self.logger.info("0x%08x: %s", head, str(sym))
-                                self.hits.append(HashHit(head, sym))
+                                logger.info("0x%08x: %s", head, str(sym))
+                                self.addHit(head, sym)
                                 self.markupLine(head, sym)
             except Exception, err:
-               self.logger.exception("Exception: %s", str(err))
+               logger.exception("Exception: %s", str(err))
 
     def markupLine(self, loc, sym):
         comm = '%s!%s' % (sym.libName, sym.symbolName)
-        self.logger.debug("Making comment @ 0x%08x: %s", loc, comm)
-        idc.MakeComm(loc, str(comm))
+        logger.debug("Making comment @ 0x%08x: %s", loc, comm)
+        if using_ida7api:
+            idc.set_cmt(loc, str(comm), False)
+        else:
+            idc.MakeComm(loc, str(comm))
 
     def lookForDwordArray(self, start, end):
-        self.logger.debug("Starting to look between: %08x:%08x", start, end)
+        logger.debug("Starting to look between: %08x:%08x", start, end)
         for i in range(end-start):
             loc = start + i
-            val = idc.Dword(loc)
+            if using_ida7api:
+                val = idaapi.get_dword(loc)
+            else:
+                val = idc.Dword(loc)
 
             for h in self.params.hashTypes:
                 hits = self.dbstore.getSymbolByTypeHash(h.hashType, val)
                 for sym in hits:
-                    self.logger.info("0x%08x: %s", loc, str(sym))
-                    self.hits.append(HashHit(loc, sym))
+                    logger.info("0x%08x: %s", loc, str(sym))
+                    self.addHit(loc, sym)
                     self.markupLine(loc, sym)
 
 ###################################################################
@@ -327,35 +379,38 @@ class ShellcodeHashSearcher(object):
 class SearchLauncher(object):
     def __init__(self):
         self.params = SearchParams()
-        self.logger = jayutils.getLogger('SearchLauncher')
 
     def run(self):
         try:
-            self.logger.debug("Starting up")
+            logger.debug("Starting up")
             dbFile = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'shellcode_hashes', 'sc_hashes.db'))
-            self.logger.debug('Trying default db path: %s', dbFile)
+            logger.debug('Trying default db path: %s', dbFile)
             if not os.path.exists(dbFile):
-                dbFile = idc.AskFile(0, "*.db", "Select shellcode hash database")
+                if using_ida7api:
+                    dbFile = idc.AskFile(0, "*.db", "Select shellcode hash database")
+                else:
+                    dbFile = idaapi.ask_file(False, "*.db", "Select shellcode hash database")
+
                 if (dbFile is None) or (not os.path.isfile(dbFile)):
-                    self.logger.debug("No file select. Stopping now")
+                    logger.debug("No file select. Stopping now")
                     return
             self.dbstore = DbStore(dbFile)
-            self.logger.debug("Loaded db file: %s", dbFile)
+            logger.debug("Loaded db file: %s", dbFile)
             if QT_AVAILABLE:
                 self.launchGuiInput()
             else:
                 self.launchManualPrompts() 
             searcher = ShellcodeHashSearcher(self.dbstore, self.params)
-            self.logger.debug('Starting to run the searcher now')
+            logger.debug('Starting to run the searcher now')
             searcher.run()
-            self.logger.debug("Done")
+            logger.debug("Done")
         except RejectionException:
-            self.logger.info('User canceled action')
+            logger.info('User canceled action')
         except Exception, err:
-            self.logger.exception("Exception caught: %s", str(err))
+            logger.exception("Exception caught: %s", str(err))
 
     def launchGuiInput(self):
-        self.logger.debug('Launching dialog')
+        logger.debug('Launching dialog')
         dlg = ShellcodeWidget(self.dbstore, self.params)
         #disable script timeout -> otherwise cancel script dialog pops up
         oldTo = idaapi.set_script_timeout(0)
@@ -363,12 +418,12 @@ class SearchLauncher(object):
         #restore the timeout
         idaapi.set_script_timeout(oldTo)
         if res == QtWidgets.QDialog.Accepted:
-            self.logger.debug('Dialog result: accepted')
+            logger.debug('Dialog result: accepted')
         elif res == QtWidgets.QDialog.Rejected:
-            self.logger.debug('Dialog result: rejected')
+            logger.debug('Dialog result: rejected')
             raise RejectionException()
         else:
-            self.logger.debug('Unknown result')
+            logger.debug('Unknown result')
             raise RuntimeError('Dialog unknown result')
 
     def launchManualPrompts(self):
@@ -382,6 +437,7 @@ class SearchLauncher(object):
         for each one. Kind of painful here since only can do y/n prompt.
         TODO: Find a better/less painful prompt method!
         '''
+        # Only run if QT not available, so not bothering with ida7 check
         hashTypes = self.dbstore.getAllHashTypes()
         for h in hashTypes:
             if 1 == idc.AskYN(1, str('Include hash: %s' % h.hashName)):
@@ -390,7 +446,8 @@ class SearchLauncher(object):
             raise RuntimeError('No hashes selected')
 
     def promptForSearchTypes(self):
-        self.logger.debug("Promping for search types")
+        # Only run if QT not available, so not bothering with ida7 check
+        logger.debug("Promping for search types")
         if idc.AskYN(1, str('Search for DWORD array of hashes?')) == 1:
             self.params.searchDwordArray = True
         if idc.AskYN(1, str('Search for push argument hash value?')) == 1:
@@ -400,34 +457,34 @@ class SearchLauncher(object):
             raise RuntimeError('No search types selected')
 
     def promptForRange(self):
+        # Only run if QT not available, so not bothering with ida7 check
         #check if a range has already been selected - if so skip prompt
-        start = idc.SelStart()
-        if start != idc.BADADDR:
-            self.logger.info('Processing range 0x%08x - 0x%08x', self.params.startAddr, self.params.endAddr)
-            self.params.startAddr = start
-            self.params.endAddr = idc.SelEnd()
+        if using_ida7api:
+            selstart = idc.read_selection_start()
+            selend = idc.read_selection_end()
+            segstart = idc.get_segm_start(idc.here())
+            segend = idc.get_segm_end(idc.here())
         else:
-            self.logger.info('Processing current segment only')
-            self.params.startAddr = idc.SegStart(idc.here())
+            selstart = idc.SelStart()
+            selend = idc.SelEnd()
+            seg = idc.SegStart(idc.here())
             self.params.endAddr = idc.SegEnd(idc.here())
-            #self.logger.debug("Promping for range")
-            #if 1 == idc.AskYN(1, str('Search entire file?')):
-            #    addr = idc.AskAddr(0, 'Enter start address to search (0 defaults to start of file)')
-            #    if addr < 0:
-            #        self.logger.debug("Error: AskAddr for start failed")
-            #    self.params.startAddr = addr
-            #    addr = idc.AskAddr(0, 'Enter end address to search (0 defaults to end of file)')
-            #    if addr < 0:
-            #        self.logger.debug("Error: AskAddr for end failed")
-            #    self.params.endAddr = addr
+
+        if selstart != idc.BADADDR:
+            self.params.startAddr = selstart
+            self.params.endAddr = selend
+            logger.info('Processing range 0x%08x - 0x%08x', self.params.startAddr, self.params.endAddr)
+        else:
+            self.params.startAddr = segstart
+            self.params.endAddr = segend
+            logger.info('Processing current segment only')
 
 ###################################################################
 #
 ###################################################################
 
 def main():
-    #logger = jayutils.configLogger('', logging.DEBUG)
-    logger = jayutils.configLogger('', logging.INFO)
+
     launcher = SearchLauncher()
     launcher.run()
 
