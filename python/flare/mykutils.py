@@ -8,6 +8,7 @@ import idaapi
 import idautils
 import ida_kernwin
 
+import logging
 import numbers
 from collections import namedtuple
 
@@ -18,6 +19,13 @@ __version__ = '1.0'
 
 # There is much more to this library, but it needn't be code reviewed or
 # publicly released until/unless needed to support future flare-ida tools.
+
+###############################################################################
+# Initialization
+###############################################################################
+
+logging.basicConfig(format='%(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 ###############################################################################
 # Useful tidbits
@@ -64,6 +72,39 @@ def get_bitness():
     """Get the architecture bit width of this IDB."""
     inf = idaapi.get_inf_structure()
     return 64 if inf.is_64bit() else 32 if inf.is_32bit() else 16
+
+
+def makename_safe(va, nm, max_tries=10):
+    """Attempt to name @va as @nm appending numbers up to @max_tries.
+
+    Appends _0, _1, etc. until successful or bails after the specified number
+    of tries.
+
+    Args:
+        va (numbers.Integral): Virtual address to name.
+        nm (str): Name to apply
+        max_tries (numbers.Integral): Number of times to retry naming while
+            appending successive increasing number suffices
+
+    Returns:
+        True if successful else False
+    """
+    if not all([va, nm]):
+        raise ValueError('makename_safe requires both va and nm args')
+
+    successful = False
+    tryname = nm
+    for i in range(max_tries):
+        if idc.MakeNameEx(va, tryname, idc.SN_NOWARN):
+            successful = True
+            break
+        tryname = '%s_%d' % (nm, i)
+
+    if not successful:
+        logger.error('Looped %d times and failed to name %s as %s(_N)' %
+              (max_tries, phex(va), nm))
+
+    return successful
 
 
 def for_each_call_to(callback, va=None):
