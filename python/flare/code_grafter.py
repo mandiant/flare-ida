@@ -473,7 +473,7 @@ class CodeGrafter():
 
         self._emu_stubs = {
             ('IsDebuggerPresent',): self.get_fnbytes('retn0'),
-            ('InitializeCriticalSectoin', 'EnterCriticalSection',
+            ('InitializeCriticalSection', 'EnterCriticalSection',
              'LeaveCriticalSection', 'DeleteCriticalSection'):
                 self.get_fnbytes('retn0_1arg'),
             ('CreateThread',): self.get_fnbytes('retn1_6args'),
