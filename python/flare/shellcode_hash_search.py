@@ -387,9 +387,9 @@ class SearchLauncher(object):
             logger.debug('Trying default db path: %s', dbFile)
             if not os.path.exists(dbFile):
                 if using_ida7api:
-                    dbFile = idc.AskFile(0, "*.db", "Select shellcode hash database")
-                else:
                     dbFile = idaapi.ask_file(False, "*.db", "Select shellcode hash database")
+                else:
+                    dbFile = idc.AskFile(0, "*.db", "Select shellcode hash database")
 
                 if (dbFile is None) or (not os.path.isfile(dbFile)):
                     logger.debug("No file select. Stopping now")
