@@ -1035,6 +1035,9 @@ Smork_bot
 def crc32Xor0xca9d4d4e(inString,fName):
     return (0xffffffff & (zlib.crc32(inString))) ^ 0xca9d4d4e
 
+def adler32_666(inString,fName):
+    return zlib.adler32(inString.upper(), 666) & 0xffffffff
+
 ############################################################
 
 # The list of tuples of (supported hash name, hash size, pseudo_code)
@@ -1085,6 +1088,7 @@ HASH_TYPES = [
     ('hash_Carbanak',           32, pseudocode_hash_Carbanak),
     ('hash_ror13AddUpperDllnameHash32',32, pseudocode_hash_ror13AddUpperDllnameHash32),
     ('fnv1Xor67f', 32, pseudocode_fnv1Xor67f),
+    ('adler32_666', 32, 'Adler32 with starting value 666')
 ]
 
 
