@@ -664,7 +664,7 @@ def imul83hAdd(inString,fName):
     for i in inString:
         val = val * 131
         val += ord(i)
-    val = val & 0x7FFFFFFF
+    val = val & 0xFFFFFFFF
     return val
 
 pseudocode_imul83hAdd = '''acc := 0;
