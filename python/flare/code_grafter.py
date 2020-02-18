@@ -42,8 +42,8 @@ g_cmt_pointed = '(Pointed'
 
 # Name tuple -> implementation lookup
 g_patch_pointer_width = {
-    32: idc.PatchDword,
-    64: idc.PatchQword,
+    32: idc.patch_dword,
+    64: idc.patch_qword,
 }
 
 # Per-architecture/bitness library of native function implementations. Each
@@ -102,6 +102,14 @@ g_strlen_metapc_64bit = (
 g_fnbytes[METAPC][32]['strlen'] = g_strlen_metapc_32bit
 g_fnbytes[METAPC][64]['strlen'] = g_strlen_metapc_64bit
 
+# return "en-US";
+g_fnbytes[METAPC][32]['setlocale'] = 'e8000000005883c007c20800' + '656e2d5553'
+g_fnbytes[METAPC][64]['setlocale'] = '488b0501000000c3' + '656e2d5553'
+g_fnbytes[METAPC][32]['wsetlocale'] = ('e8000000005883c007c20800' +
+                                       '65006e002d0055005300')
+g_fnbytes[METAPC][64]['wsetlocale'] = ('488b0501000000c3' +
+                                       '65006e002d0055005300')
+
 g_retn0_metapc_64bit = '4831c0c3'
 g_retn1_metapc_64bit = '4831c04883c001c3'
 
@@ -111,14 +119,20 @@ g_fnbytes[METAPC][64]['retn0'] = g_retn0_metapc_64bit
 g_fnbytes[METAPC][32]['retn0_1arg'] = '31c0c20400'
 g_fnbytes[METAPC][64]['retn0_1arg'] = g_retn0_metapc_64bit
 
-g_fnbytes[METAPC][32]['retn0_3args'] = '31c0c20C00'
-g_fnbytes[METAPC][64]['retn0_3args'] = g_retn0_metapc_64bit
+g_fnbytes[METAPC][32]['retn0_3arg'] = '31c0c20C00'
+g_fnbytes[METAPC][64]['retn0_3arg'] = g_retn0_metapc_64bit
 
 g_fnbytes[METAPC][32]['retn1'] = '31c040c3'
 g_fnbytes[METAPC][64]['retn1'] = g_retn1_metapc_64bit
 
-g_fnbytes[METAPC][32]['retn1_6args'] = '31c040c21800'
-g_fnbytes[METAPC][64]['retn1_6args'] = g_retn1_metapc_64bit
+g_fnbytes[METAPC][32]['retn1_1arg'] = '31c040c20400'
+g_fnbytes[METAPC][64]['retn1_1arg'] = g_retn1_metapc_64bit
+
+g_fnbytes[METAPC][32]['retn1_2arg'] = '31c040c20800'
+g_fnbytes[METAPC][64]['retn1_2arg'] = g_retn1_metapc_64bit
+
+g_fnbytes[METAPC][32]['retn1_6arg'] = '31c040c21800'
+g_fnbytes[METAPC][64]['retn1_6arg'] = g_retn1_metapc_64bit
 
 
 # Allocator => All names it is known by
@@ -390,8 +404,8 @@ def _emit_fnbytes(emit_instr_cb, header, footer, indent, fva=None, warn=True):
     the position-dependent portions.
     """
     fva = fva or idc.here()
-    fva = idc.GetFunctionAttr(fva, idc.FUNCATTR_START)
-    va_end = idc.GetFunctionAttr(fva, idc.FUNCATTR_END)
+    fva = idc.get_func_attr(fva, idc.FUNCATTR_START)
+    va_end = idc.get_func_attr(fva, idc.FUNCATTR_END)
 
     # Operand types observed in position-independent code:
     #   1: General Register (al,ax,es,ds...)
@@ -412,11 +426,11 @@ def _emit_fnbytes(emit_instr_cb, header, footer, indent, fva=None, warn=True):
     optypes_found = set()
     s = header.format(name=nm)
     while va != va_end:
-        size = idc.ItemSize(va)
+        size = idc.get_item_size(va)
         the_bytes = idc.GetManyBytes(va, size)
 
         for i in range(0, 8):
-            optype = idc.GetOpType(va, i)
+            optype = idc.get_operand_type(va, i)
             if optype:
                 optypes_found.add(optype)
 
@@ -468,17 +482,28 @@ class CodeGrafter():
     2. Call the `graftCodeToIdb()` method
     """
     def __init__(self, cpu=None, bits=None):
-        self.cpu = cpu or idc.GetProcessorName()
+        self.cpu = cpu or idaapi.get_inf_structure().procname
         self.bits = bits or mykutils.get_bitness()
 
         self._emu_stubs = {
             ('IsDebuggerPresent',): self.get_fnbytes('retn0'),
             ('InitializeCriticalSection', 'EnterCriticalSection',
-             'LeaveCriticalSection', 'DeleteCriticalSection'):
+             'LeaveCriticalSection', 'DeleteCriticalSection',
+             'EncodePointer', 'DecodePointer'):
                 self.get_fnbytes('retn0_1arg'),
-            ('CreateThread',): self.get_fnbytes('retn1_6args'),
+            ('FlsSetValue', '___acrt_FlsSetValue@8'):
+                self.get_fnbytes('retn1_2arg'),
+            ('FlsGetValue', '___acrt_FlsGetValue@4'):
+                self.get_fnbytes('retn1_1arg'),
+            ('setlocale', '_setlocale', '__setlocale'):
+                self.get_fnbytes('setlocale'),
+            ('wsetlocale', '_wsetlocale', '__wsetlocale',):
+                self.get_fnbytes('wsetlocale'),
+            ('GetLastError',): self.get_fnbytes('retn0'),
+            ('SetLastError',): self.get_fnbytes('retn0_1arg'),
+            ('CreateThread',): self.get_fnbytes('retn1_6arg'),
             ('free', '_free', '??3@YAXPAX@Z'): self.get_fnbytes('retn0'),
-            ('HeapFree',): self.get_fnbytes('retn0_3args'),
+            ('HeapFree',): self.get_fnbytes('retn0_3arg'),
             ('strcpy', '_strcpy'): self.get_fnbytes('strcpy'),
             ('strlen',): self.get_fnbytes('strlen'),
             ('lstrlenA',): self.get_fnbytes('strlen'),
@@ -537,7 +562,7 @@ class CodeGrafter():
 
     def _findGraftedSegments(self):
         return [s for s in SegPlanner() if
-                idc.RptCmt(s.start) == g_seg_sig_code_grafter]
+                idc.get_cmt(s.start, 1) == g_seg_sig_code_grafter]
 
     def _addSegments(self, mem=0x4000000):
         """Create emulation stub segments.
@@ -577,7 +602,7 @@ class CodeGrafter():
 
         for seg in (code, arena):
             idc.AddSeg(seg.start, seg.end, 0, use32, 0, idc.scPub)
-            idc.MakeRptCmt(seg.start, g_seg_sig_code_grafter)
+            idc.set_cmt(seg.start, g_seg_sig_code_grafter, 1)
 
         # Designate location for the malloc "arena"
         va_arena = arena.start
@@ -593,22 +618,22 @@ class CodeGrafter():
         #
         # Assuming 64-bit to provide enough space irrespective of architecture
         va_malloc_next = code.start
-        idc.PatchQword(va_malloc_next, 0)
-        idc.MakeQword(va_malloc_next)
-        idc.MakeName(va_malloc_next, self._stubname('malloc_next'))
+        idc.patch_qword(va_malloc_next, 0)
+        idc.create_qword(va_malloc_next)
+        idc.set_name(va_malloc_next, self._stubname('malloc_next'), idc.SN_CHECK)
         va_next_code = code.start + 0x10
 
         def next_addr_align4(base, sc):
             return mykutils.align(base + (len(sc) / 2), 4)
 
         def add_stub_func(va, sc, nm):
-            idaapi.patch_many_bytes(va, binascii.unhexlify(sc))
-            idc.MakeCode(va)
-            idc.MakeFunction(va)
-            idc.MakeName(va, self._stubname(nm))
+            idaapi.patch_bytes(va, binascii.unhexlify(sc))
+            idc.create_insn(va)
+            idc.add_func(va)
+            idc.set_name(va, self._stubname(nm), idc.SN_CHECK)
             cmt = ('%s implementation generated by FLARE Code Grafter' %
                    (nm))
-            idc.MakeRptCmt(va, cmt)
+            idc.set_cmt(va, cmt, 1)
 
         # Allocators are handled specially because their templates must be
         # filled with addresses for the global data they access
@@ -627,37 +652,37 @@ class CodeGrafter():
                 va_next_code = next_addr_align4(va_next_code, sc)
 
     def _get_imp_for_register_call(self, va_call, nm=None):
-        if idc.GetMnem(va_call) != 'call':
+        if idc.print_insn_mnem(va_call) != 'call':
             msg = 'va_call must be the virtual address of a call instruction'
             raise ValueError(msg)
 
-        reg = idc.GetOpnd(va_call, 0)
+        reg = idc.print_operand(va_call, 0)
         va_mov = mykutils.find_instr(va_call, 'up', 'mov',
                                      [(0, 1, reg), (1, 2, None)])
         if not va_mov:
             return None
 
-        if nm and (nm not in idc.GetOpnd(va_mov, 1)):
+        if nm and (nm not in idc.print_operand(va_mov, 1)):
             return None
 
-        va_imp = idc.GetOperandValue(va_mov, 1)
+        va_imp = idc.get_operand_value(va_mov, 1)
         return va_imp
 
     def _patchCalls(self):
         def do_patch_call(va):
             retval = False
-            stub_loc = idc.LocByName(self._stubname(nm))
+            stub_loc = idc.get_name_ea_simple(self._stubname(nm))
 
             # Preserve original disassembly and format new comment
-            old_target = idc.GetOpnd(va, 0)
-            orig_cmt = idc.Comment(va) or ''
+            old_target = idc.print_operand(va, 0)
+            orig_cmt = idc.get_cmt(va, 0) or ''
             new_cmt = '%s\n\t%s' % (g_patched_call_cmt, idc.GetDisasm(va))
 
-            if idc.GetOpType(va, 0) == 2:  # e.g. call ds:HeapAlloc
+            if idc.get_operand_type(va, 0) == 2:  # e.g. call ds:HeapAlloc
                 retval = patch_import(va, self._stubname(nm))
                 new_cmt += '\n%s %s to %s)' % (g_cmt_pointed, old_target,
                                                self._stubname(nm))
-            elif idc.GetOpType(va, 0) == 1:  # e.g. call ebx ; HeapAlloc
+            elif idc.get_operand_type(va, 0) == 1:  # e.g. call ebx ; HeapAlloc
                 va_imp = self._get_imp_for_register_call(va, nm)
                 if va_imp:
                     patch_pointer_width(va_imp, stub_loc)
@@ -668,7 +693,7 @@ class CodeGrafter():
 
             else:  # Usually optype 7 otherwise
                 # Won't work if displacement exceeds 32-bit operand size
-                call_offset_loc = va + idc.ItemSize(va)
+                call_offset_loc = va + idc.get_item_size(va)
                 if abs(call_offset_loc - stub_loc) > 0x100000000:
                     msg = ('Call site at %s too far from %s (%s)' %
                            (phex(va), self._stubname(nm), phex(stub_loc)))
@@ -678,26 +703,27 @@ class CodeGrafter():
             if retval:
                 if orig_cmt:
                     new_cmt += '\n%s' % (orig_cmt)
-                idc.MakeComm(va, new_cmt)
+                idc.set_cmt(va, new_cmt, 0)
                 ida_xref.add_cref(va, stub_loc, ida_xref.fl_CN)
 
             return retval
 
         for names in self._emu_stubs.keys():
             for nm in names:
-                va = idc.LocByName(nm)
+                va = idc.get_name_ea_simple(nm)
                 mykutils.for_each_call_to(do_patch_call, va)
 
         for nm, aliases in g_allocators_aliases.items():
             for alias in aliases:
                 # do_patch_call closure will turn <nm> into stub_<nm>
-                mykutils.for_each_call_to(do_patch_call, idc.LocByName(alias))
+                mykutils.for_each_call_to(do_patch_call,
+                                          idc.get_name_ea_simple(alias))
 
     def _unpatchCalls(self, grafted_segs):
         def do_unpatch_call(va_callsite):
-            size = idc.ItemSize(va_callsite)
+            size = idc.get_item_size(va_callsite)
             ida_xref.del_cref(va_callsite, fva_stub, 0)
-            cmt = idc.Comment(va_callsite)
+            cmt = idc.get_cmt(va_callsite, 0)
 
             newcmt = cmt
 
@@ -715,11 +741,11 @@ class CodeGrafter():
                         newcmt = newcmt[newcmt.find('\n') + 1:]
 
             if newcmt != cmt:
-                idc.MakeComm(va_callsite, newcmt)
+                idc.set_cmt(va_callsite, newcmt, 0)
 
-            if idc.GetOpType(va_callsite, 0) == 2:
+            if idc.get_operand_type(va_callsite, 0) == 2:
                 patch_import(va_callsite, idc.BADADDR)
-            elif idc.GetOpType(va_callsite, 0) == 1:
+            elif idc.get_operand_type(va_callsite, 0) == 1:
                 va_imp = self._get_imp_for_register_call(va_callsite)
                 if va_imp:
                     patch_pointer_width(va_imp, idc.BADADDR)
@@ -746,7 +772,7 @@ def patch_import(va, target):
     Returns:
         bool: True if successful
     """
-    is_call = idc.GetMnem(va) == 'call'
+    is_call = idc.print_insn_mnem(va) == 'call'
 
     if is_call:
         opno = 0
@@ -755,9 +781,9 @@ def patch_import(va, target):
         return False
 
     if isinstance(target, basestring):
-        target = idc.LocByName(target)
+        target = idc.get_name_ea_simple(target)
 
-    patch_pointer_width(idc.GetOperandValue(va, opno), target)
+    patch_pointer_width(idc.get_operand_value(va, opno), target)
 
     return True
 
@@ -772,7 +798,7 @@ def patch_call(va, new_nm):
     Returns:
         bool: True if successful
     """
-    is_call = idc.GetMnem(va) == 'call'
+    is_call = idc.print_insn_mnem(va) == 'call'
 
     if is_call:
         opno = 0
@@ -782,7 +808,7 @@ def patch_call(va, new_nm):
         return False
 
     # Already done?
-    if idc.GetOpnd(va, opno) == new_nm:
+    if idc.print_operand(va, opno) == new_nm:
         return True
 
     ok, code = idautils.Assemble(va, new_asm)
@@ -791,7 +817,7 @@ def patch_call(va, new_nm):
         logger.warn('Failed assembling %s: %s' % (phex(va), new_asm))
         return False
 
-    orig_opcode_len = idc.ItemSize(va)
+    orig_opcode_len = idc.get_item_size(va)
     new_code_len = len(code)
 
     if orig_opcode_len < new_code_len:
@@ -804,7 +830,7 @@ def patch_call(va, new_nm):
         delta = orig_opcode_len - new_code_len
         code += '\x90' * delta
 
-    idaapi.patch_many_bytes(va, code)
+    idaapi.patch_bytes(va, code)
 
     return True
 
@@ -822,7 +848,7 @@ def revert_patch(va, nr):
     ret = False
 
     orig = [ida_bytes.get_original_byte(va + i) for i in range(nr)]
-    current = [idc.Byte(va + i) for i in range(nr)]
+    current = [idc.get_wide_byte(va + i) for i in range(nr)]
 
     for i in range(len(orig)):
         if orig[i] != current[i]:

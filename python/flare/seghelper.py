@@ -55,7 +55,8 @@ class SegPlanner():
     """For planning (but not implementing) where to add segments."""
 
     def __init__(self):
-        self._segs = [Segment(va, idc.SegEnd(va)) for va in idautils.Segments()]
+        self._segs = [Segment(va, idc.get_segm_end(va))
+                      for va in idautils.Segments()]
         self._segs.sort()
 
     def __iter__(self):

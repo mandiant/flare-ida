@@ -114,16 +114,19 @@ def for_each_call_to(callback, va=None):
     unspecified.
     """
     if not va:
-        nm = ida_kernwin.get_highlighted_identifier()
-        va = idc.LocByName(nm)
-        if va >= idaapi.cvar.inf.maxEA:
-            va = None
+        v = ida_kernwin.get_current_viewer()
+        hi = ida_kernwin.get_highlight(v)
+        if hi and hi[1]:
+            nm = hi[0]
+            va = idc.get_name_ea_simple(nm)
+            if va >= idaapi.cvar.inf.maxEA:
+                va = None
 
     va = va or idc.here()
 
     # Obtain and de-duplicate addresses of xrefs that are calls
     callsites = set([x.frm for x in idautils.XrefsTo(va)
-                     if idc.GetMnem(x.frm) == 'call'])
+                     if idc.print_insn_mnem(x.frm) == 'call'])
     for va in callsites:
         callback(va)
 
@@ -175,12 +178,12 @@ def find_instr(va_start, direction, mnems=None, op_specs=[], max_instrs=0):
 
     if direction.lower() in ('up', 'back', 'backward', 'previous', 'prev'):
         iterate = idaapi.prev_head
-        va_stop = idc.GetFunctionAttr(va, idc.FUNCATTR_START)
+        va_stop = idc.get_func_attr(va, idc.FUNCATTR_START)
         if va_stop == idc.BADADDR:
             va_stop = 0
     elif direction.lower() in ('down', 'forward', 'next'):
         iterate = idaapi.next_head
-        va_stop = idc.GetFunctionAttr(va, idc.FUNCATTR_END)
+        va_stop = idc.get_func_attr(va, idc.FUNCATTR_END)
     else:
         raise ValueError('Invalid direction')
 
@@ -214,7 +217,7 @@ def is_conformant_instr(va, mnems, op_specs):
         msg = 'Must specify either a mnemonic or an operand specification list'
         raise ValueError(msg)
 
-    mnem_current = idc.GetMnem(va)
+    mnem_current = idc.print_insn_mnem(va)
     if mnems:
         if isinstance(mnems, basestring):
             if mnem_current != mnems:
@@ -248,7 +251,7 @@ def is_conformant_operand(va, op_spec):
         msg = 'Must specify an operand position and either a name or type'
         raise ValueError(msg)
 
-    if spec.type is not None and idc.GetOpType(va, spec.pos) != spec.type:
+    if spec.type is not None and idc.get_operand_type(va, spec.pos) != spec.type:
         return False
 
     if spec.name is not None:
@@ -257,7 +260,7 @@ def is_conformant_operand(va, op_spec):
         #   4 Base + Index + Displacement
         # Use substring matching to compensate for IDA Pro's representation
         if spec.type in (3, 4):
-            if spec.name not in idc.GetOpnd(va, spec.pos):
+            if spec.name not in idc.print_operand(va, spec.pos):
                 return False
 
         # For these types:
@@ -267,12 +270,12 @@ def is_conformant_operand(va, op_spec):
         # Check both address and name
         elif spec.type in (5, 6, 7):
             if isinstance(spec.name, basestring):
-                if idc.GetOpnd(va, spec.pos) != spec.name:
+                if idc.print_operand(va, spec.pos) != spec.name:
                     return False
-            elif idc.GetOperandValue(va, spec.pos) != spec.name:
+            elif idc.get_operand_value(va, spec.pos) != spec.name:
                 return False
         else:
-            if idc.GetOpnd(va, spec.pos) != spec.name:
+            if idc.print_operand(va, spec.pos) != spec.name:
                 return False
 
     return True
