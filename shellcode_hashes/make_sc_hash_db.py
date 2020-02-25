@@ -1099,7 +1099,7 @@ HASH_TYPES = [
     ('hash_Carbanak',           32, pseudocode_hash_Carbanak),
     ('hash_ror13AddUpperDllnameHash32',32, pseudocode_hash_ror13AddUpperDllnameHash32),
     ('fnv1Xor67f', 32, pseudocode_fnv1Xor67f),
-    ('adler32_666', 32, 'Adler32 with starting value 666')
+    ('adler32_666', 32, 'Adler32 with starting value 666'),
     ('shift0x82F63B78',           32, 'like crc32c'),
 ]
 
