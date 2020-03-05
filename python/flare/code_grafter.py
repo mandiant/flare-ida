@@ -427,7 +427,7 @@ def _emit_fnbytes(emit_instr_cb, header, footer, indent, fva=None, warn=True):
     s = header.format(name=nm)
     while va != va_end:
         size = idc.get_item_size(va)
-        the_bytes = idc.GetManyBytes(va, size)
+        the_bytes = idc.get_bytes(va, size)
 
         for i in range(0, 8):
             optype = idc.get_operand_type(va, i)
