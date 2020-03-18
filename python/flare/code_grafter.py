@@ -4,6 +4,7 @@
 """Code grafting: Static linking of code into IDBs to aid emulation."""
 
 import idc
+import ida_ua
 import idaapi
 import idautils
 import ida_xref
@@ -57,45 +58,206 @@ g_fnbytes = {
 }
 
 g_fnbytes[METAPC][32]['memcpy'] = (
-    '558bec83ec088b45088945f88b4d0c894dfc8b55108b451083e80189451085d2'
-    '741e8b4df88b55fc8a0288018b4df883c101894df88b55fc83c2018955fcebd2'
-    '8b45088be55dc3'
+    '55'                        # 0x1000: push     ebp
+    '8BEC'                      # 0x1001: mov      ebp, esp
+    '83EC08'                    # 0x1003: sub      esp, 8
+    '8B4508'                    # 0x1006: mov      eax, dword ptr [ebp + 8]
+    '8945F8'                    # 0x1009: mov      dword ptr [ebp - 8], eax
+    '8B4D0C'                    # 0x100c: mov      ecx, dword ptr [ebp + 0xc]
+    '894DFC'                    # 0x100f: mov      dword ptr [ebp - 4], ecx
+    '8B5510'                    # 0x1012: mov      edx, dword ptr [ebp + 0x10]
+    '8B4510'                    # 0x1015: mov      eax, dword ptr [ebp + 0x10]
+    '83E801'                    # 0x1018: sub      eax, 1
+    '894510'                    # 0x101b: mov      dword ptr [ebp + 0x10], eax
+    '85D2'                      # 0x101e: test     edx, edx
+    '741E'                      # 0x1020: je       0x1040
+    '8B4DF8'                    # 0x1022: mov      ecx, dword ptr [ebp - 8]
+    '8B55FC'                    # 0x1025: mov      edx, dword ptr [ebp - 4]
+    '8A02'                      # 0x1028: mov      al, byte ptr [edx]
+    '8801'                      # 0x102a: mov      byte ptr [ecx], al
+    '8B4DF8'                    # 0x102c: mov      ecx, dword ptr [ebp - 8]
+    '83C101'                    # 0x102f: add      ecx, 1
+    '894DF8'                    # 0x1032: mov      dword ptr [ebp - 8], ecx
+    '8B55FC'                    # 0x1035: mov      edx, dword ptr [ebp - 4]
+    '83C201'                    # 0x1038: add      edx, 1
+    '8955FC'                    # 0x103b: mov      dword ptr [ebp - 4], edx
+    'EBD2'                      # 0x103e: jmp      0x1012
+    '8B4508'                    # 0x1040: mov      eax, dword ptr [ebp + 8]
+    '8BE5'                      # 0x1043: mov      esp, ebp
+    '5D'                        # 0x1045: pop      ebp
+    'C3'                        # 0x1046: ret
     )
 g_fnbytes[METAPC][64]['memcpy'] = (
-    '4c89442418488954241048894c24084883ec18488b4424204889442408488b44'
-    '242848890424488b4c2430488b4424304883e80148894424304885c9742a488b'
-    '4c2408488b04240fb6008801488b4424084883c0014889442408488b04244883'
-    'c00148890424ebbe488b4424204883c418c3'
+    '4C89442418'                # 0x1000: mov       qword ptr [rsp + 0x18], r8
+    '4889542410'                # 0x1005: mov       qword ptr [rsp + 0x10], rdx
+    '48894C2408'                # 0x100a: mov       qword ptr [rsp + 8], rcx
+    '4883EC18'                  # 0x100f: sub       rsp, 0x18
+    '488B442420'                # 0x1013: mov       rax, qword ptr [rsp + 0x20]
+    '4889442408'                # 0x1018: mov       qword ptr [rsp + 8], rax
+    '488B442428'                # 0x101d: mov       rax, qword ptr [rsp + 0x28]
+    '48890424'                  # 0x1022: mov       qword ptr [rsp], rax
+    '488B4C2430'                # 0x1026: mov       rcx, qword ptr [rsp + 0x30]
+    '488B442430'                # 0x102b: mov       rax, qword ptr [rsp + 0x30]
+    '4883E801'                  # 0x1030: sub       rax, 1
+    '4889442430'                # 0x1034: mov       qword ptr [rsp + 0x30], rax
+    '4885C9'                    # 0x1039: test      rcx, rcx
+    '742A'                      # 0x103c: je        0x1068
+    '488B4C2408'                # 0x103e: mov       rcx, qword ptr [rsp + 8]
+    '488B0424'                  # 0x1043: mov       rax, qword ptr [rsp]
+    '0FB600'                    # 0x1047: movzx     eax, byte ptr [rax]
+    '8801'                      # 0x104a: mov       byte ptr [rcx], al
+    '488B442408'                # 0x104c: mov       rax, qword ptr [rsp + 8]
+    '4883C001'                  # 0x1051: add       rax, 1
+    '4889442408'                # 0x1055: mov       qword ptr [rsp + 8], rax
+    '488B0424'                  # 0x105a: mov       rax, qword ptr [rsp]
+    '4883C001'                  # 0x105e: add       rax, 1
+    '48890424'                  # 0x1062: mov       qword ptr [rsp], rax
+    'EBBE'                      # 0x1066: jmp       0x1026
+    '488B442420'                # 0x1068: mov       rax, qword ptr [rsp + 0x20]
+    '4883C418'                  # 0x106d: add       rsp, 0x18
+    'C3'                        # 0x1071: ret
     )
 
 g_fnbytes[METAPC][32]['memset'] = (
-    '558bec518b45088945fc8b4d108b551083ea0189551085c974138b45fc8a4d0c'
-    '88088b55fc83c2018955fcebdd8b45088be55dc3'
+    '55'                        # 0x1000: push     ebp
+    '8BEC'                      # 0x1001: mov      ebp, esp
+    '51'                        # 0x1003: push     ecx
+    '8B4508'                    # 0x1004: mov      eax, dword ptr [ebp + 8]
+    '8945FC'                    # 0x1007: mov      dword ptr [ebp - 4], eax
+    '8B4D10'                    # 0x100a: mov      ecx, dword ptr [ebp + 0x10]
+    '8B5510'                    # 0x100d: mov      edx, dword ptr [ebp + 0x10]
+    '83EA01'                    # 0x1010: sub      edx, 1
+    '895510'                    # 0x1013: mov      dword ptr [ebp + 0x10], edx
+    '85C9'                      # 0x1016: test     ecx, ecx
+    '7413'                      # 0x1018: je       0x102d
+    '8B45FC'                    # 0x101a: mov      eax, dword ptr [ebp - 4]
+    '8A4D0C'                    # 0x101d: mov      cl, byte ptr [ebp + 0xc]
+    '8808'                      # 0x1020: mov      byte ptr [eax], cl
+    '8B55FC'                    # 0x1022: mov      edx, dword ptr [ebp - 4]
+    '83C201'                    # 0x1025: add      edx, 1
+    '8955FC'                    # 0x1028: mov      dword ptr [ebp - 4], edx
+    'EBDD'                      # 0x102b: jmp      0x100a
+    '8B4508'                    # 0x102d: mov      eax, dword ptr [ebp + 8]
+    '8BE5'                      # 0x1030: mov      esp, ebp
+    '5D'                        # 0x1032: pop      ebp
+    'C3'                        # 0x1033: ret
     )
 g_fnbytes[METAPC][64]['memset'] = (
-    '4c894424188954241048894c24084883ec18488b44242048890424488b4c2430'
-    '488b4424304883e80148894424304885c97419488b0c240fb64424288801488b'
-    '04244883c00148890424ebcf488b4424204883c418c3'
+    '4C89442418'                # 0x1000: mov       qword ptr [rsp + 0x18], r8
+    '89542410'                  # 0x1005: mov       dword ptr [rsp + 0x10], edx
+    '48894C2408'                # 0x1009: mov       qword ptr [rsp + 8], rcx
+    '4883EC18'                  # 0x100e: sub       rsp, 0x18
+    '488B442420'                # 0x1012: mov       rax, qword ptr [rsp + 0x20]
+    '48890424'                  # 0x1017: mov       qword ptr [rsp], rax
+    '488B4C2430'                # 0x101b: mov       rcx, qword ptr [rsp + 0x30]
+    '488B442430'                # 0x1020: mov       rax, qword ptr [rsp + 0x30]
+    '4883E801'                  # 0x1025: sub       rax, 1
+    '4889442430'                # 0x1029: mov       qword ptr [rsp + 0x30], rax
+    '4885C9'                    # 0x102e: test      rcx, rcx
+    '7419'                      # 0x1031: je        0x104c
+    '488B0C24'                  # 0x1033: mov       rcx, qword ptr [rsp]
+    '0FB6442428'                # 0x1037: movzx     eax, byte ptr [rsp + 0x28]
+    '8801'                      # 0x103c: mov       byte ptr [rcx], al
+    '488B0424'                  # 0x103e: mov       rax, qword ptr [rsp]
+    '4883C001'                  # 0x1042: add       rax, 1
+    '48890424'                  # 0x1046: mov       qword ptr [rsp], rax
+    'EBCF'                      # 0x104a: jmp       0x101b
+    '488B442420'                # 0x104c: mov       rax, qword ptr [rsp + 0x20]
+    '4883C418'                  # 0x1051: add       rsp, 0x18
+    'C3'                        # 0x1055: ret
     )
 
 g_fnbytes[METAPC][32]['strcpy'] = (
-    '558bec518b45088945fc8b4dfc8b550c8a0288018b4dfc0fbe118b45fc83c001'
-    '8945fc8b4d0c83c101894d0c85d27402ebd88b45088be55dc3'
+    '55'                        # 0x1000: push      ebp
+    '8BEC'                      # 0x1001: mov       ebp, esp
+    '51'                        # 0x1003: push      ecx
+    '8B4508'                    # 0x1004: mov       eax, dword ptr [ebp + 8]
+    '8945FC'                    # 0x1007: mov       dword ptr [ebp - 4], eax
+    '8B4DFC'                    # 0x100a: mov       ecx, dword ptr [ebp - 4]
+    '8B550C'                    # 0x100d: mov       edx, dword ptr [ebp + 0xc]
+    '8A02'                      # 0x1010: mov       al, byte ptr [edx]
+    '8801'                      # 0x1012: mov       byte ptr [ecx], al
+    '8B4DFC'                    # 0x1014: mov       ecx, dword ptr [ebp - 4]
+    '0FBE11'                    # 0x1017: movsx     edx, byte ptr [ecx]
+    '8B45FC'                    # 0x101a: mov       eax, dword ptr [ebp - 4]
+    '83C001'                    # 0x101d: add       eax, 1
+    '8945FC'                    # 0x1020: mov       dword ptr [ebp - 4], eax
+    '8B4D0C'                    # 0x1023: mov       ecx, dword ptr [ebp + 0xc]
+    '83C101'                    # 0x1026: add       ecx, 1
+    '894D0C'                    # 0x1029: mov       dword ptr [ebp + 0xc], ecx
+    '85D2'                      # 0x102c: test      edx, edx
+    '7402'                      # 0x102e: je        0x1032
+    'EBD8'                      # 0x1030: jmp       0x100a
+    '8B4508'                    # 0x1032: mov       eax, dword ptr [ebp + 8]
+    '8BE5'                      # 0x1035: mov       esp, ebp
+    '5D'                        # 0x1037: pop       ebp
+    'C3'                        # 0x1038: ret
     )
 g_fnbytes[METAPC][64]['strcpy'] = (
-    '488954241048894c24084883ec18488b44242048890424488b0c24488b442428'
-    '0fb6008801488b04240fbe08488b04244883c00148890424488b4424284883c0'
-    '01488944242885c97402ebcb488b4424204883c418c3'
+    '4889542410'                # 0x1000: mov       qword ptr [rsp + 0x10], rdx
+    '48894C2408'                # 0x1005: mov       qword ptr [rsp + 8], rcx
+    '4883EC18'                  # 0x100a: sub       rsp, 0x18
+    '488B442420'                # 0x100e: mov       rax, qword ptr [rsp + 0x20]
+    '48890424'                  # 0x1013: mov       qword ptr [rsp], rax
+    '488B0C24'                  # 0x1017: mov       rcx, qword ptr [rsp]
+    '488B442428'                # 0x101b: mov       rax, qword ptr [rsp + 0x28]
+    '0FB600'                    # 0x1020: movzx     eax, byte ptr [rax]
+    '8801'                      # 0x1023: mov       byte ptr [rcx], al
+    '488B0424'                  # 0x1025: mov       rax, qword ptr [rsp]
+    '0FBE08'                    # 0x1029: movsx     ecx, byte ptr [rax]
+    '488B0424'                  # 0x102c: mov       rax, qword ptr [rsp]
+    '4883C001'                  # 0x1030: add       rax, 1
+    '48890424'                  # 0x1034: mov       qword ptr [rsp], rax
+    '488B442428'                # 0x1038: mov       rax, qword ptr [rsp + 0x28]
+    '4883C001'                  # 0x103d: add       rax, 1
+    '4889442428'                # 0x1041: mov       qword ptr [rsp + 0x28], rax
+    '85C9'                      # 0x1046: test      ecx, ecx
+    '7402'                      # 0x1048: je        0x104c
+    'EBCB'                      # 0x104a: jmp       0x1017
+    '488B442420'                # 0x104c: mov       rax, qword ptr [rsp + 0x20]
+    '4883C418'                  # 0x1051: add       rsp, 0x18
+    'C3'                        # 0x1055: ret
     )
 
 g_strlen_metapc_32bit = (
-    '558bec51c745fc000000008b45080fbe088b550883c20189550885c9740b8b45'
-    'fc83c0018945fcebe28b45fc8be55dc3'
+    '55'                        # 0x1000: push      ebp
+    '8BEC'                      # 0x1001: mov       ebp, esp
+    '51'                        # 0x1003: push      ecx
+    'C745FC00000000'            # 0x1004: mov       dword ptr [ebp - 4], 0
+    '8B4508'                    # 0x100b: mov       eax, dword ptr [ebp + 8]
+    '0FBE08'                    # 0x100e: movsx     ecx, byte ptr [eax]
+    '8B5508'                    # 0x1011: mov       edx, dword ptr [ebp + 8]
+    '83C201'                    # 0x1014: add       edx, 1
+    '895508'                    # 0x1017: mov       dword ptr [ebp + 8], edx
+    '85C9'                      # 0x101a: test      ecx, ecx
+    '740B'                      # 0x101c: je        0x1029
+    '8B45FC'                    # 0x101e: mov       eax, dword ptr [ebp - 4]
+    '83C001'                    # 0x1021: add       eax, 1
+    '8945FC'                    # 0x1024: mov       dword ptr [ebp - 4], eax
+    'EBE2'                      # 0x1027: jmp       0x100b
+    '8B45FC'                    # 0x1029: mov       eax, dword ptr [ebp - 4]
+    '8BE5'                      # 0x102c: mov       esp, ebp
+    '5D'                        # 0x102e: pop       ebp
+    'C3'                        # 0x102f: ret
     )
 g_strlen_metapc_64bit = (
-    '48894c24084883ec1848c7042400000000488b4424200fbe08488b4424204883'
-    'c001488944242085c9740e488b04244883c00148890424ebd8488b04244883c4'
-    '18c3'
+    '48894C2408'                # 0x1000: mov       qword ptr [rsp + 8], rcx
+    '4883EC18'                  # 0x1005: sub       rsp, 0x18
+    '48C7042400000000'          # 0x1009: mov       qword ptr [rsp], 0
+    '488B442420'                # 0x1011: mov       rax, qword ptr [rsp + 0x20]
+    '0FBE08'                    # 0x1016: movsx     ecx, byte ptr [rax]
+    '488B442420'                # 0x1019: mov       rax, qword ptr [rsp + 0x20]
+    '4883C001'                  # 0x101e: add       rax, 1
+    '4889442420'                # 0x1022: mov       qword ptr [rsp + 0x20], rax
+    '85C9'                      # 0x1027: test      ecx, ecx
+    '740E'                      # 0x1029: je        0x1039
+    '488B0424'                  # 0x102b: mov       rax, qword ptr [rsp]
+    '4883C001'                  # 0x102f: add       rax, 1
+    '48890424'                  # 0x1033: mov       qword ptr [rsp], rax
+    'EBD8'                      # 0x1037: jmp       0x1011
+    '488B0424'                  # 0x1039: mov       rax, qword ptr [rsp]
+    '4883C418'                  # 0x103d: add       rsp, 0x18
+    'C3'                        # 0x1041: ret
     )
 
 # Covers lstrlenA
@@ -103,35 +265,87 @@ g_fnbytes[METAPC][32]['strlen'] = g_strlen_metapc_32bit
 g_fnbytes[METAPC][64]['strlen'] = g_strlen_metapc_64bit
 
 # return "en-US";
-g_fnbytes[METAPC][32]['setlocale'] = 'e8000000005883c007c20800' + '656e2d5553'
-g_fnbytes[METAPC][64]['setlocale'] = '488b0501000000c3' + '656e2d5553'
-g_fnbytes[METAPC][32]['wsetlocale'] = ('e8000000005883c007c20800' +
-                                       '65006e002d0055005300')
-g_fnbytes[METAPC][64]['wsetlocale'] = ('488b0501000000c3' +
-                                       '65006e002d0055005300')
+g_fnbytes[METAPC][32]['setlocale'] = (
+    'E800000000'                # 0x1000: call      0x1005
+    '58'                        # 0x1005: pop       eax
+    '83C007'                    # 0x1006: add       eax, 7
+    'C20800'                    # 0x1009: ret       8
+    '656e2d555300'              # db 'en-US',0
+    )
+g_fnbytes[METAPC][64]['setlocale'] = (
+    '488B0501000000'            # 0x1000: mov     rax, qword ptr [rip + 1]
+    'C3'                        # 0x1007: ret
+    '656e2d555300'              # db 'en-US',0
+    )
 
-g_retn0_metapc_64bit = '4831c0c3'
-g_retn1_metapc_64bit = '4831c04883c001c3'
+g_fnbytes[METAPC][32]['wsetlocale'] = (
+    'E800000000'                # 0x1000: call     0x1005
+    '58'                        # 0x1005: pop      eax
+    '83C007'                    # 0x1006: add      eax, 7
+    'C20800'                    # 0x1009: ret      8
+    '65006e002d00550053000000'  # text "UTF-16LE", 'en-US',0
+    )
+g_fnbytes[METAPC][64]['wsetlocale'] = (
+    '488B0501000000'            # 0x1000: mov     rax, qword ptr [rip + 1]
+    'C3'                        # 0x1007: ret
+    '65006e002d00550053000000'  # text "UTF-16LE", 'en-US',0
+    )
 
-g_fnbytes[METAPC][32]['retn0'] = '31c0c3'
+g_retn0_metapc_64bit = (
+    '4831C0'                    # 0x1000: xor     rax, rax
+    'C3'                        # 0x1003: ret
+    )
+
+g_retn1_metapc_64bit = (
+    '4831C0'                    # 0x1000: xor     rax, rax
+    '4883C001'                  # 0x1003: add     rax, 1
+    'C3'                        # 0x1007: ret
+    )
+
+g_fnbytes[METAPC][32]['retn0'] = (
+    '31C0'                      # 0x1000: xor     eax, eax
+    'C3'                        # 0x1002: ret
+    )
 g_fnbytes[METAPC][64]['retn0'] = g_retn0_metapc_64bit
 
-g_fnbytes[METAPC][32]['retn0_1arg'] = '31c0c20400'
+g_fnbytes[METAPC][32]['retn0_1arg'] = (
+    '31C0'                      # 0x1000: xor     eax, eax
+    'C20400'                    # 0x1002: ret     4
+    )
 g_fnbytes[METAPC][64]['retn0_1arg'] = g_retn0_metapc_64bit
 
-g_fnbytes[METAPC][32]['retn0_3arg'] = '31c0c20C00'
+g_fnbytes[METAPC][32]['retn0_3arg'] = (
+    '31C0'                      # 0x1000: xor     eax, eax
+    'C20C00'                    # 0x1002: ret     0xc
+    )
 g_fnbytes[METAPC][64]['retn0_3arg'] = g_retn0_metapc_64bit
 
-g_fnbytes[METAPC][32]['retn1'] = '31c040c3'
+g_fnbytes[METAPC][32]['retn1'] = (
+    '31C0'                      # 0x1000: xor     eax, eax
+    '40'                        # 0x1002: inc     eax
+    'C3'                        # 0x1003: ret
+    )
 g_fnbytes[METAPC][64]['retn1'] = g_retn1_metapc_64bit
 
-g_fnbytes[METAPC][32]['retn1_1arg'] = '31c040c20400'
+g_fnbytes[METAPC][32]['retn1_1arg'] = (
+    '31C0'                      # 0x1000: xor     eax, eax
+    '40'                        # 0x1002: inc     eax
+    'C20400'                    # 0x1003: ret     4
+    )
 g_fnbytes[METAPC][64]['retn1_1arg'] = g_retn1_metapc_64bit
 
-g_fnbytes[METAPC][32]['retn1_2arg'] = '31c040c20800'
+g_fnbytes[METAPC][32]['retn1_2arg'] = (
+    '31C0'                      # 0x1000: xor     eax, eax
+    '40'                        # 0x1002: inc     eax
+    'C20800'                    # 0x1003: ret     8
+    )
 g_fnbytes[METAPC][64]['retn1_2arg'] = g_retn1_metapc_64bit
 
-g_fnbytes[METAPC][32]['retn1_6arg'] = '31c040c21800'
+g_fnbytes[METAPC][32]['retn1_6arg'] = (
+    '31C0'                      # 0x1000: xor     eax, eax
+    '40'                        # 0x1002: inc     eax
+    'C21800'                    # 0x1003: ret     0x18
+    )
 g_fnbytes[METAPC][64]['retn1_6arg'] = g_retn1_metapc_64bit
 
 
@@ -340,7 +554,11 @@ def emit_fnbytes_ascii(fva=None, warn=True):
     header = ''
     footer = ''
     indent = ''
-    return _emit_fnbytes(_emit_ascii, header, footer, indent, fva, warn)
+
+    def _emit_instr_ascii(va, the_bytes, size):
+        return binascii.hexlify(the_bytes)
+
+    return _emit_fnbytes(_emit_instr_ascii, header, footer, indent, fva, warn)
 
 
 def emit_fnbytes_python(fva=None, warn=True):
@@ -358,7 +576,12 @@ def emit_fnbytes_python(fva=None, warn=True):
     header = 'instrs_{name} = (\n'
     footer = ')'
     indent = '    '
-    return _emit_fnbytes(_emit_for_python, header, footer, indent, fva, warn)
+
+    def _emit_instr_python(va, the_bytes, size):
+        disas = idc.GetDisasm(va)
+        return "'%s' # %s\n" % (binascii.hexlify(the_bytes), disas)
+
+    return _emit_fnbytes(_emit_instr_python, header, footer, indent, fva, warn)
 
 
 def emit_fnbytes_c(fva=None, warn=True):
@@ -377,22 +600,13 @@ def emit_fnbytes_c(fva=None, warn=True):
     header = 'unsigned char *instrs_{name} = {{\n'
     footer = '};'
     indent = '\t'
-    return _emit_fnbytes(_emit_for_c, header, footer, indent, fva, warn)
 
+    def _emit_instr_for_c(va, the_bytes, size):
+        disas = idc.GetDisasm(va)
+        buf = ''.join(['\\x%s' % (binascii.hexlify(c)) for c in the_bytes])
+        return '"%s" /* %s */\n' % (buf, disas)
 
-def _emit_for_c(va, the_bytes, size):
-    disas = idc.GetDisasm(va)
-    byte_buf = ''.join(['\\x%s' % (binascii.hexlify(c)) for c in the_bytes])
-    return '"%s" /* %s */\n' % (byte_buf, disas)
-
-
-def _emit_for_python(va, the_bytes, size):
-    disas = idc.GetDisasm(va)
-    return "'%s' # %s\n" % (binascii.hexlify(the_bytes), disas)
-
-
-def _emit_ascii(va, the_bytes, size):
-    return binascii.hexlify(the_bytes)
+    return _emit_fnbytes(_emit_instr_for_c, header, footer, indent, fva, warn)
 
 
 def _emit_fnbytes(emit_instr_cb, header, footer, indent, fva=None, warn=True):
@@ -408,24 +622,26 @@ def _emit_fnbytes(emit_instr_cb, header, footer, indent, fva=None, warn=True):
     va_end = idc.get_func_attr(fva, idc.FUNCATTR_END)
 
     # Operand types observed in position-independent code:
-    #   1: General Register (al,ax,es,ds...)
-    #   3: Base + Index
-    #   4: Base + Index + Displacement
-    #   5: Immediate
-    #   7: Immediate Near Address
+    optypes_position_independent = set([
+        ida_ua.o_reg,       # 1: General Register (al,ax,es,ds...)
+        ida_ua.o_phrase,    # 3: Base + Index
+        ida_ua.o_displ,     # 4: Base + Index + Displacement
+        ida_ua.o_imm,       # 5: Immediate
+        ida_ua.o_near,      # 7: Immediate Near Address
+    ])
+
     # Notably missing because I want to note and handle these if/as they are
     # encountered:
-    #   8: FPP register
-    #   9: 386 control register
-    #   10: 386 debug register
-    #   11: 386 trace register
-    optypes_position_independent = set([1, 3, 4, 5, 7])
+    # ida_ua.o_idpspec0 = 8: FPP register
+    # ida_ua.o_idpspec1 = 9: 386 control register
+    # ida_ua.o_idpspec2 = 10: 386 debug register
+    # ida_ua.o_idpspec3 = 11: 386 trace register
 
     va = fva
-    nm = idc.Name(fva)
+    nm = idc.get_name(fva)
     optypes_found = set()
     s = header.format(name=nm)
-    while va != va_end:
+    while va not in (va_end, idc.BADADDR):
         size = idc.get_item_size(va)
         the_bytes = idc.get_bytes(va, size)
 
@@ -435,7 +651,7 @@ def _emit_fnbytes(emit_instr_cb, header, footer, indent, fva=None, warn=True):
                 optypes_found.add(optype)
 
         s += indent + emit_instr_cb(va, the_bytes, size)
-        va = idc.NextHead(va)
+        va = idc.next_head(va)
     s += footer
 
     position_dependent = optypes_found - optypes_position_independent
@@ -620,7 +836,7 @@ class CodeGrafter():
         va_malloc_next = code.start
         idc.patch_qword(va_malloc_next, 0)
         idc.create_qword(va_malloc_next)
-        idc.set_name(va_malloc_next, self._stubname('malloc_next'), idc.SN_CHECK)
+        mykutils.makename_safe(va_malloc_next, self._stubname('malloc_next'))
         va_next_code = code.start + 0x10
 
         def next_addr_align4(base, sc):
@@ -630,7 +846,7 @@ class CodeGrafter():
             idaapi.patch_bytes(va, binascii.unhexlify(sc))
             idc.create_insn(va)
             idc.add_func(va)
-            idc.set_name(va, self._stubname(nm), idc.SN_CHECK)
+            mykutils.makename_safe(va, self._stubname(nm))
             cmt = ('%s implementation generated by FLARE Code Grafter' %
                    (nm))
             idc.set_cmt(va, cmt, 1)
@@ -678,11 +894,11 @@ class CodeGrafter():
             orig_cmt = idc.get_cmt(va, 0) or ''
             new_cmt = '%s\n\t%s' % (g_patched_call_cmt, idc.GetDisasm(va))
 
-            if idc.get_operand_type(va, 0) == 2:  # e.g. call ds:HeapAlloc
+            if idc.get_operand_type(va, 0) == ida_ua.o_mem:
                 retval = patch_import(va, self._stubname(nm))
                 new_cmt += '\n%s %s to %s)' % (g_cmt_pointed, old_target,
                                                self._stubname(nm))
-            elif idc.get_operand_type(va, 0) == 1:  # e.g. call ebx ; HeapAlloc
+            elif idc.get_operand_type(va, 0) == ida_ua.o_reg:
                 va_imp = self._get_imp_for_register_call(va, nm)
                 if va_imp:
                     patch_pointer_width(va_imp, stub_loc)
@@ -743,9 +959,9 @@ class CodeGrafter():
             if newcmt != cmt:
                 idc.set_cmt(va_callsite, newcmt, 0)
 
-            if idc.get_operand_type(va_callsite, 0) == 2:
+            if idc.get_operand_type(va_callsite, 0) == ida_ua.o_mem:
                 patch_import(va_callsite, idc.BADADDR)
-            elif idc.get_operand_type(va_callsite, 0) == 1:
+            elif idc.get_operand_type(va_callsite, 0) == ida_ua.o_reg:
                 va_imp = self._get_imp_for_register_call(va_callsite)
                 if va_imp:
                     patch_pointer_width(va_imp, idc.BADADDR)

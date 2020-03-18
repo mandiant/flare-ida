@@ -4,6 +4,7 @@
 """IDA utils by @mykill"""
 
 import idc
+import ida_ua
 import idaapi
 import idautils
 import ida_kernwin
@@ -17,14 +18,10 @@ __copyright__ = 'Copyright (C) 2019 FireEye, Inc.'
 __license__ = 'Apache License 2.0'
 __version__ = '1.0'
 
-# There is much more to this library, but it needn't be code reviewed or
-# publicly released until/unless needed to support future flare-ida tools.
-
 ###############################################################################
 # Initialization
 ###############################################################################
 
-logging.basicConfig(format='%(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 ###############################################################################
@@ -95,7 +92,7 @@ def makename_safe(va, nm, max_tries=10):
     successful = False
     tryname = nm
     for i in range(max_tries):
-        if idc.MakeNameEx(va, tryname, idc.SN_NOWARN):
+        if idc.set_name(va, tryname, idc.SN_NOWARN):
             successful = True
             break
         tryname = '%s_%d' % (nm, i)
@@ -131,7 +128,23 @@ def for_each_call_to(callback, va=None):
         callback(va)
 
 
-# Instruction operand specification
+# Instruction operand specification.
+#
+# Operand types are from ida_ua.o_* e.g. o_reg, o_mem.
+# >>> {x: getattr(ida_ua, x) for x in dir(ida_ua) if x.startswith('o_')}
+#
+# Quick ref:
+#   ida_ua.o_reg ==      1: "General Register (al,ax,es,ds...)",
+#   ida_ua.o_mem ==      2: "Memory Reference",
+#   ida_ua.o_phrase ==   3: "Base + Index",
+#   ida_ua.o_displ ==    4: "Base + Index + Displacement",
+#   ida_ua.o_imm ==      5: "Immediate",
+#   ida_ua.o_far ==      6: "Immediate Far Address",
+#   ida_ua.o_near ==     7: "Immediate Near Address",
+#   ida_ua.o_idpspec0 == 8: "FPP register",
+#   ida_ua.o_idpspec1 == 9: "386 control register",
+#   ida_ua.o_idpspec2 == 10: "386 debug register",
+#   ida_ua.o_idpspec3 == 11: "386 trace register",
 OpSpec = namedtuple('OpSpec', 'pos type name')
 
 
@@ -256,19 +269,19 @@ def is_conformant_operand(va, op_spec):
 
     if spec.name is not None:
         # For two types:
-        #   3 Base + Index
-        #   4 Base + Index + Displacement
+        #   o_phrase = 3 Base + Index
+        #   o_displ =  4 Base + Index + Displacement
         # Use substring matching to compensate for IDA Pro's representation
-        if spec.type in (3, 4):
+        if spec.type in (ida_ua.o_phrase, ida_ua.o_displ):
             if spec.name not in idc.print_operand(va, spec.pos):
                 return False
 
         # For these types:
-        #   5   Immediate
-        #   6   Immediate Far Address
-        #   7   Immediate Near Address
+        #   o_imm =  5   Immediate
+        #   o_far =  6   Immediate Far Address
+        #   o_near = 7   Immediate Near Address
         # Check both address and name
-        elif spec.type in (5, 6, 7):
+        elif spec.type in (ida_ua.o_imm, ida_ua.o_far, ida_ua.o_near):
             if isinstance(spec.name, basestring):
                 if idc.print_operand(va, spec.pos) != spec.name:
                     return False
