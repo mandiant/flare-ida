@@ -1,7 +1,34 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2019 FireEye, Inc. All Rights Reserved.
 
-"""Code grafting: Static linking of code into IDBs to aid emulation."""
+"""Code grafting: Static linking of code into IDA Databases to aid emulation.
+
+Code Grafting allows you to graft static implementations of imported
+functions into your IDA Database (IDB) for purposes of emulation in Bochs IDB
+mode or by other emulators.
+
+Instructions for adding new code to the library of synthetic import function
+implementations supported by Code Grafter:
+
+1.) Build a binary with position-independent native code to replace your
+    functions of interest.
+2.) Open your binary in IDA Pro and import/use `mykutils.emit_fnbytes_python()`
+    to obtain a Python-compatible hex string containing the function's opcodes.
+3.) Add the resulting string to `code_grafter.g_fnbytes` (defined in
+    `code_grafter.py`).
+4.) In the IDB for your sample, you can then import `code_grafter` and graft
+    code onto your IDB to support emulation of the function that you just added
+    to the function implementation library.
+
+      from flare import code_grafter
+      cg = code_grafter.CodeGrafter()
+      cg.graftCodeToIdb()
+
+If you don't want to modify your copy of `code_grafter.py`, you may find it
+possible to instead add your extracted function opcode strings to a separate
+script, then import `code_grafter` and dynamically add the opcdoe strings to 
+`code_grafter.g_fnbytes` before using Code Grafter on your IDB.
+"""
 
 import idc
 import ida_ua
@@ -520,150 +547,6 @@ g_fnbytes_allocators[METAPC][64]['VirtualAlloc'] = (
     '4883c418'          # add     rsp, 18h
     'c3'                # retn
 )
-
-###############################################################################
-# Code Carving i.e. function extraction
-###############################################################################
-# Why:
-# To extend Code Grafting by adding function opcodes to the library already
-# present here.
-#
-# How to use:
-# 1.) Build a binary with native code to replace your functions of interest.
-# 2.) Use emit_fnbytes_ascii() or emit_fnbytes_python() to get hex bytes you
-#     can use in Python. For simple functions, the former is fine. For more
-#     complicated functions, the latter includes useful disassembly comments.
-# 3.) Add the function to g_fnbytes or g_fnbytes_allocators as appropriate
-#     either after importing this module or by modifying this module.
-# 4.) In the IDB for your sample, you can then import this and execute:
-#       CodeGrafter().graftCodeToIdb()
-
-
-def emit_fnbytes_ascii(fva=None, warn=True):
-    """Emit function bytes as an ASCII hexlified string.
-
-    Args:
-        fva (numbers.Integral): function virtual address.
-            Defaults to here() if that is the start of a function, else
-            defaults to the start of the function that here() is a part of.
-        warn (bool): enable interactive warnings
-
-    Returns:
-        str: ASCII hexlified string of instruction opcode bytes for function.
-    """
-    header = ''
-    footer = ''
-    indent = ''
-
-    def _emit_instr_ascii(va, the_bytes, size):
-        return binascii.hexlify(the_bytes)
-
-    return _emit_fnbytes(_emit_instr_ascii, header, footer, indent, fva, warn)
-
-
-def emit_fnbytes_python(fva=None, warn=True):
-    """Emit function bytes as Python code with disassembly in comments.
-
-    Args:
-        fva (numbers.Integral): function virtual address.
-            Defaults to here() if that is the start of a function, else
-            defaults to the start of the function that here() is a part of.
-        warn (bool): enable interactive warnings
-
-    Returns:
-        str: Python code you can spruce up and paste into a script.
-    """
-    header = 'instrs_{name} = (\n'
-    footer = ')'
-    indent = '    '
-
-    def _emit_instr_python(va, the_bytes, size):
-        disas = idc.GetDisasm(va)
-        return "'%s' # %s\n" % (binascii.hexlify(the_bytes), disas)
-
-    return _emit_fnbytes(_emit_instr_python, header, footer, indent, fva, warn)
-
-
-def emit_fnbytes_c(fva=None, warn=True):
-    """Emit function bytes as C code with disassembly in comments.
-
-    Args:
-        fva (numbers.Integral): function virtual address.
-            Defaults to here() if that is the start of a function, else
-            defaults to the start of the function that here() is a part of.
-        warn (bool): enable interactive warnings
-
-    Returns:
-        str: C code you can spruce up and paste into a script.
-    """
-
-    header = 'unsigned char *instrs_{name} = {{\n'
-    footer = '};'
-    indent = '\t'
-
-    def _emit_instr_for_c(va, the_bytes, size):
-        disas = idc.GetDisasm(va)
-        buf = ''.join(['\\x%s' % (binascii.hexlify(c)) for c in the_bytes])
-        return '"%s" /* %s */\n' % (buf, disas)
-
-    return _emit_fnbytes(_emit_instr_for_c, header, footer, indent, fva, warn)
-
-
-def _emit_fnbytes(emit_instr_cb, header, footer, indent, fva=None, warn=True):
-    """Emit function bytes in a format defined by the callback and
-    headers/footers provided.
-
-    Warns if any instruction operands are not consistent with
-    position-independent code, in which case the user may need to templatize
-    the position-dependent portions.
-    """
-    fva = fva or idc.here()
-    fva = idc.get_func_attr(fva, idc.FUNCATTR_START)
-    va_end = idc.get_func_attr(fva, idc.FUNCATTR_END)
-
-    # Operand types observed in position-independent code:
-    optypes_position_independent = set([
-        ida_ua.o_reg,       # 1: General Register (al,ax,es,ds...)
-        ida_ua.o_phrase,    # 3: Base + Index
-        ida_ua.o_displ,     # 4: Base + Index + Displacement
-        ida_ua.o_imm,       # 5: Immediate
-        ida_ua.o_near,      # 7: Immediate Near Address
-    ])
-
-    # Notably missing because I want to note and handle these if/as they are
-    # encountered:
-    # ida_ua.o_idpspec0 = 8: FPP register
-    # ida_ua.o_idpspec1 = 9: 386 control register
-    # ida_ua.o_idpspec2 = 10: 386 debug register
-    # ida_ua.o_idpspec3 = 11: 386 trace register
-
-    va = fva
-    nm = idc.get_name(fva)
-    optypes_found = set()
-    s = header.format(name=nm)
-    while va not in (va_end, idc.BADADDR):
-        size = idc.get_item_size(va)
-        the_bytes = idc.get_bytes(va, size)
-
-        for i in range(0, 8):
-            optype = idc.get_operand_type(va, i)
-            if optype:
-                optypes_found.add(optype)
-
-        s += indent + emit_instr_cb(va, the_bytes, size)
-        va = idc.next_head(va)
-    s += footer
-
-    position_dependent = optypes_found - optypes_position_independent
-    if position_dependent:
-        msg = ('This code may have position-dependent operands (optype %s)' %
-               (', '.join([str(o) for o in position_dependent])))
-        if warn:
-            Warning(msg)
-        else:
-            logger.warn(msg)
-
-    return s
 
 
 ###############################################################################
