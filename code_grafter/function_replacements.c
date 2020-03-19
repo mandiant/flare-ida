@@ -264,11 +264,19 @@ test_allocators(void)
 
     terminate_tests_if_next_malloc_outside_arena(alloc_size);
     test1 = my_malloc(alloc_size);
-    memset(test1, 0xaa, alloc_size);
+    if (test1 == NULL) {
+        PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 1a)\n");
+    } else {
+        memset(test1, 0xaa, alloc_size);
+    }
 
     terminate_tests_if_next_malloc_outside_arena(alloc_size);
     test2 = my_HeapAlloc(NULL, 0, alloc_size);
-    memset(test2, 0xbb, alloc_size);
+    if (test2 == NULL) {
+        PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 1b)\n");
+    } else {
+        memset(test2, 0xbb, alloc_size);
+    }
 
     terminate_tests_if_next_malloc_outside_arena(alloc_size);
     test3 = my_VirtualAlloc(
@@ -277,25 +285,23 @@ test_allocators(void)
         MEM_RESERVE|MEM_COMMIT,
         PAGE_EXECUTE_READWRITE
        );
-    memset(test3, 0xcc, alloc_size);
-
-    if (test1 == NULL) {
-        PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 1a)\n");
-    } else if (test2 == NULL) {
-        PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 1b)\n");
-    } else if (test3 == NULL) {
+    if (test3 == NULL) {
         PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 1c)\n");
-    } else if (test1 == test2) {
+    } else {
+        memset(test3, 0xcc, alloc_size);
+    }
+
+    if (test1 == test2) {
         PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 2a)\n");
     } else if (test2 == test3) {
         PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 2b)\n");
     } else if (test1 == test3) {
         PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 2c)\n");
-    } else if (!memcmp(test1, test2, alloc_size)) {
+    } else if (test1 && test2 && !memcmp(test1, test2, alloc_size)) {
         PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 3a)\n");
-    } else if (!memcmp(test2, test3, alloc_size)) {
+    } else if (test2 && test3 && !memcmp(test2, test3, alloc_size)) {
         PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 3b)\n");
-    } else if (!memcmp(test1, test3, alloc_size)) {
+    } else if (test1 && test3 && !memcmp(test1, test3, alloc_size)) {
         PDEBUG_ERROR(__FUNCTION__ ": FAILED (criterion 3c)\n");
     } else {
         PDEBUG_INFO(__FUNCTION__ ": succeeded\n");
