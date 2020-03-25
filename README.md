@@ -72,3 +72,6 @@ This script creates cross-references between selector references and their imple
 
 ### ironstrings ###
 `ironstrings.py` is an IDAPython script that uses code emulation to recover constructed strings (stackstrings) from malware. Please see the details in the script's [README](https://github.com/fireeye/flare-ida/blob/master/python/flare/ironstrings/README.md).
+
+### Code Grafter ###
+`code_grafter.py` is an IDAPython script that grafts code to an IDA database to implement various imported functions and increase the likelihood of being able to execute an unpacker or decoder entirely under Bochs (or any other emulation tools that don't implement special handling for these functions). This prevents faults when emulated execution reaches functions such as `VirtualAlloc` or `lstrlenA`.
