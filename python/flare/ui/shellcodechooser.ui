@@ -66,6 +66,27 @@
               </property>
              </widget>
             </item>
+            <item row="2" column="0">
+             <widget class="QCheckBox" name="cb_XORSeed">
+              <property name="text">
+               <string>XOR seed</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="text_XORSeed">
+              <property name="text">
+               <string>XOR seed value</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QCheckBox" name="cb_useDecompiler">
+              <property name="text">
+               <string>Use Decompiler</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </item>
          </layout>

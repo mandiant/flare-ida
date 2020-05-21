@@ -41,7 +41,7 @@ try:
     from PyQt5 import QtWidgets, QtCore
     from shellcode_widget import ShellcodeWidget
 except ImportError:
-    print 'Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PyQt5 build available at \n"http://hex-rays.com/products/ida/support/download.shtml"'
+    print ('Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PyQt5 build available at \n"http://hex-rays.com/products/ida/support/download.shtml"')
     QT_AVAILABLE = False
 
 
@@ -209,6 +209,9 @@ class SearchParams(object):
         self.searchDwordArray = False
         self.searchPushArgs = False
         self.createStruct = False
+        self.useDecompiler = False
+        self.useXORSeed = False
+        self.XORSeed = 0
 
         #startAddr & endAddr: range to process
         if using_ida7api:
@@ -339,20 +342,44 @@ class ShellcodeHashSearcher(object):
                             opval = idc.get_operand_value(head, i)
                         else:
                             opval = idc.GetOperandValue(head, i)
+                        if self.params.useXORSeed:
+                            opval = opval ^ self.params.XORSeed
                         for h in self.params.hashTypes:
                             hits = self.dbstore.getSymbolByTypeHash(h.hashType, opval)
                             for sym in hits:
                                 logger.info("0x%08x: %s", head, str(sym))
                                 self.addHit(head, sym)
-                                self.markupLine(head, sym)
-            except Exception, err:
+                                self.markupLine(head, sym, self.params.useDecompiler)
+            except Exception as err:
                logger.exception("Exception: %s", str(err))
 
-    def markupLine(self, loc, sym):
+    def addDecompilerComment(self, loc, comment):
+        cfunc = idaapi.decompile(loc)
+        eamap = cfunc.get_eamap()
+        decompObjAddr = eamap[loc][0].ea
+        tl = idaapi.treeloc_t()
+        tl.ea = decompObjAddr
+        commentSet = False
+        for itp in range (idaapi.ITP_SEMI, idaapi.ITP_COLON):
+            tl.itp = itp
+            cfunc.set_user_cmt(tl, comment)
+            cfunc.save_user_cmts()
+            unused = cfunc.__str__()
+            if not cfunc.has_orphan_cmts():
+                commentSet = True
+                cfunc.save_user_cmts()
+                break
+            cfunc.del_orphan_cmts()
+        if not commentSet:
+            print ("pseudo comment error at %08x" % loc)
+
+    def markupLine(self, loc, sym, useDecompiler = False):
         comm = '%s!%s' % (sym.libName, sym.symbolName)
         logger.debug("Making comment @ 0x%08x: %s", loc, comm)
         if using_ida7api:
             idc.set_cmt(loc, str(comm), False)
+            if useDecompiler and idaapi.get_func(loc) != None:
+                self.addDecompilerComment(loc, str(comm))
         else:
             idc.MakeComm(loc, str(comm))
 
@@ -406,7 +433,7 @@ class SearchLauncher(object):
             logger.debug("Done")
         except RejectionException:
             logger.info('User canceled action')
-        except Exception, err:
+        except Exception as err:
             logger.exception("Exception caught: %s", str(err))
 
     def launchGuiInput(self):
