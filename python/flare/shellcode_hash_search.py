@@ -34,13 +34,14 @@ import idc
 import idaapi
 import idautils
 
-import jayutils
+from . import jayutils
 
 QT_AVAILABLE = True
 try:
     from PyQt5 import QtWidgets, QtCore
-    from shellcode_widget import ShellcodeWidget
-except ImportError:
+    from .shellcode_widget import ShellcodeWidget
+except ImportError as err:
+    print('ImportError: %s' % err)
     print ('Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PyQt5 build available at \n"http://hex-rays.com/products/ida/support/download.shtml"')
     QT_AVAILABLE = False
 
@@ -466,19 +467,24 @@ class SearchLauncher(object):
         '''
         # Only run if QT not available, so not bothering with ida7 check
         hashTypes = self.dbstore.getAllHashTypes()
-        for h in hashTypes:
-            if 1 == idc.AskYN(1, str('Include hash: %s' % h.hashName)):
-                self.params.hashTypes.append(h)
         if len(self.params.hashTypes) == 0:
             raise RuntimeError('No hashes selected')
+        # we used to prompt y/n for each one. too obnoxious, just force all hashes
+        self.params.hashTypes = hashTypes
 
     def promptForSearchTypes(self):
         # Only run if QT not available, so not bothering with ida7 check
         logger.debug("Promping for search types")
-        if idc.AskYN(1, str('Search for DWORD array of hashes?')) == 1:
-            self.params.searchDwordArray = True
-        if idc.AskYN(1, str('Search for push argument hash value?')) == 1:
-            self.params.searchPushArgs = True
+        if using_ida7api:
+            if idaapi.ASKBTN_YES == idaapi.ask_yn(idaapi.ASKBTN_YES, str('Search for DWORD array of hashes?')):
+                self.params.searchDwordArray = True
+            if idaapi.ASKBTN_YES == idaapi.ask_yn(idaapi.ASKBTN_YES, str('Search for DWORD array of hashes?')):
+                self.params.searchDwordArray = True
+        else:
+            if idc.AskYN(1, str('Search for push argument hash value?')) == 1:
+                self.params.searchPushArgs = True
+            if idc.AskYN(1, str('Search for DWORD array of hashes?')) == 1:
+                self.params.searchDwordArray = True
 
         if (not self.params.searchDwordArray) and (not self.params.searchPushArgs):
             raise RuntimeError('No search types selected')

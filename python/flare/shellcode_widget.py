@@ -33,9 +33,9 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
 
 # Import the compiled UI module
-from shellcodechooser import Ui_ShellcodeChooser
+from . shellcodechooser import Ui_ShellcodeChooser
 
-import jayutils
+from . import jayutils
 
 class ShellcodeWidget(QtWidgets.QDialog):
     def __init__(self, dbstore, params, parent=None):
@@ -68,8 +68,8 @@ class ShellcodeWidget(QtWidgets.QDialog):
         self.params.searchPushArgs = self.ui.cb_instrOps.isChecked()
         self.params.createStruct = self.ui.cb_dwordArray.isChecked() and self.ui.cb_createStruct.isChecked()
         self.params.useXORSeed = self.ui.cb_XORSeed.isChecked()
-        if self.params.useXORSeed:
-            self.params.XORSeed = int(self.ui.text_XORSeed.text(), 16)
+        if (self.params.useXORSeed) and (len(self.ui.text_XORSeed.text()) > 0):
+            self.params.XORSeed = int(self.ui.text_XORSeed.text(), 0)
         self.params.useDecompiler = self.ui.cb_useDecompiler.isChecked()
         self.params.hashTypes = [self.hashDict[t.text()] for t in self.ui.list_hashNames.selectedItems()]
         #done storing parameters -> let the outside know we're done
