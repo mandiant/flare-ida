@@ -37,11 +37,11 @@ import idc
 import idaapi
 import idautils
 
-import jayutils
-from struct_typer_widget import Ui_Dialog
+from . import jayutils
+from .struct_typer_widget import Ui_Dialog
 
 # get the IDA version number
-ida_major, ida_minor = map(int, idaapi.get_kernel_version().split("."))
+ida_major, ida_minor = list(map(int, idaapi.get_kernel_version().split(".")))
 using_ida7api = (ida_major > 6)
 
 logger = None
@@ -176,7 +176,7 @@ class StructTyperWidget(QtWidgets.QDialog):
             self.ui.setupUi(self)
             self.ui.lineEdit.setText(g_DefaultPrefixRegexp)
             self.ui.checkBox.setChecked(Qt.Unchecked)
-        except Exception, err:
+        except Exception as err:
             logger.exception('Error during init: %s', str(err))
 
     def getActiveStruct(self):
@@ -227,7 +227,7 @@ class StructTypeRunner(object):
                         pass
                     else:
                         #need the actual pointer value, not the swig wrapped struc_t
-                        struc= long(struc.this)
+                        struc= int(struc.this)
                 else:
                     structName = dlg.getActiveStruct()
                     if structName is None:
@@ -270,7 +270,7 @@ class StructTypeRunner(object):
             else:
                 logger.debug('Unknown result')
                 raise RuntimeError('Dialog unknown result')
-        except Exception, err:
+        except Exception as err:
             logger.exception("Exception caught: %s", str(err))
 
     def filterName(self, regPrefix, name):
