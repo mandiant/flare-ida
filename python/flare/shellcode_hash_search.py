@@ -468,17 +468,19 @@ class SearchLauncher(object):
         '''
         # Only run if QT not available, so not bothering with ida7 check
         hashTypes = self.dbstore.getAllHashTypes()
-        if len(self.params.hashTypes) == 0:
-            raise RuntimeError('No hashes selected')
-        # we used to prompt y/n for each one. too obnoxious, just force all hashes
+        
+		#if len(self.params.hashTypes) == 0:
+        #    raise RuntimeError('No hashes selected')
+        
+		# we used to prompt y/n for each one. too obnoxious, just force all hashes
         self.params.hashTypes = hashTypes
 
     def promptForSearchTypes(self):
         # Only run if QT not available, so not bothering with ida7 check
         logger.debug("Promping for search types")
         if using_ida7api:
-            if idaapi.ASKBTN_YES == idaapi.ask_yn(idaapi.ASKBTN_YES, str('Search for DWORD array of hashes?')):
-                self.params.searchDwordArray = True
+            if idaapi.ASKBTN_YES == idaapi.ask_yn(idaapi.ASKBTN_YES, str('Search for push argument hash values?')):
+                self.params.searchPushArgs = True
             if idaapi.ASKBTN_YES == idaapi.ask_yn(idaapi.ASKBTN_YES, str('Search for DWORD array of hashes?')):
                 self.params.searchDwordArray = True
         else:
