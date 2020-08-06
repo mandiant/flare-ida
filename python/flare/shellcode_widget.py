@@ -33,9 +33,9 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
 
 # Import the compiled UI module
-from shellcodechooser import Ui_ShellcodeChooser
+from . shellcodechooser import Ui_ShellcodeChooser
 
-import jayutils
+from . import jayutils
 
 class ShellcodeWidget(QtWidgets.QDialog):
     def __init__(self, dbstore, params, parent=None):
@@ -54,9 +54,10 @@ class ShellcodeWidget(QtWidgets.QDialog):
             self.ui.buttonBox.rejected.connect(self.reject)
             self.custom_accepted.connect(self.accept)
             self.ui.cb_dwordArray.stateChanged.connect(self.handleDwordCheckboxChange)
+            self.ui.cb_XORSeed.stateChanged.connect(self.handleXORSeedCheckboxChange)
             self.initData()
 
-        except Exception, err:
+        except Exception as err:
             self.logger.exception('Error during init: %s', str(err))
     
     custom_accepted = QtCore.pyqtSignal()
@@ -66,6 +67,10 @@ class ShellcodeWidget(QtWidgets.QDialog):
         self.params.searchDwordArray = self.ui.cb_dwordArray.isChecked()
         self.params.searchPushArgs = self.ui.cb_instrOps.isChecked()
         self.params.createStruct = self.ui.cb_dwordArray.isChecked() and self.ui.cb_createStruct.isChecked()
+        self.params.useXORSeed = self.ui.cb_XORSeed.isChecked()
+        if (self.params.useXORSeed) and (len(self.ui.text_XORSeed.text()) > 0):
+            self.params.XORSeed = int(self.ui.text_XORSeed.text(), 0)
+        self.params.useDecompiler = self.ui.cb_useDecompiler.isChecked()
         self.params.hashTypes = [self.hashDict[t.text()] for t in self.ui.list_hashNames.selectedItems()]
         #done storing parameters -> let the outside know we're done
         self.custom_accepted.emit()
@@ -74,21 +79,27 @@ class ShellcodeWidget(QtWidgets.QDialog):
         try:
             self.logger.debug('Text changed: %s', text)
             self.ui.textBrowse_description.setPlainText(self.configData[text])
-        except Exception, err:
+        except Exception as err:
             self.logger.exception('Error during text changed: %s', str(err))
 
     def handleDwordCheckboxChange(self, state):
         try:
             self.ui.cb_createStruct.setEnabled(self.ui.cb_dwordArray.isChecked())
-        except Exception, err:
+        except Exception as err:
             self.logger.exception('Error during dword check changed: %s', str(err))
+    
+    def handleXORSeedCheckboxChange(self, state):
+        try:
+            self.ui.text_XORSeed.setEnabled(self.ui.cb_XORSeed.isChecked())
+        except Exception as err:
+            self.logger.exception('Error during XOR seed check changed: %s', str(err))
 
     def initData(self):
         hashTypes = self.dbstore.getAllHashTypes()
         self.hashDict = dict([ (t.hashName, t) for t in hashTypes])
 
         for hash in hashTypes:
-            if self.configData.has_key(hash.hashName):
+            if hash.hashName in self.configData:
                 raise RuntimeError('Duplicate name not allowed')
             self.configData[hash.hashName] = hash.hashCode
             item = QtWidgets.QListWidgetItem(hash.hashName)
@@ -98,5 +109,7 @@ class ShellcodeWidget(QtWidgets.QDialog):
         self.ui.cb_dwordArray.setCheckState(QtCore.Qt.Checked)
         self.ui.cb_createStruct.setCheckState(QtCore.Qt.Checked)
         self.ui.cb_instrOps.setCheckState(QtCore.Qt.Checked)
+        self.ui.cb_XORSeed.setCheckState(QtCore.Qt.Checked)
+        self.ui.cb_useDecompiler.setCheckState(QtCore.Qt.Checked)
         return
 

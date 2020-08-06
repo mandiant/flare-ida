@@ -25,6 +25,7 @@
 ########################################################################
 
 import sys
+import ctypes
 import logging
 import os.path
 import sqlite3
@@ -33,14 +34,15 @@ import idc
 import idaapi
 import idautils
 
-import jayutils
+from . import jayutils
 
 QT_AVAILABLE = True
 try:
     from PyQt5 import QtWidgets, QtCore
-    from shellcode_widget import ShellcodeWidget
-except ImportError:
-    print 'Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PyQt5 build available at \n"http://hex-rays.com/products/ida/support/download.shtml"'
+    from .shellcode_widget import ShellcodeWidget
+except ImportError as err:
+    print('ImportError: %s' % err)
+    print ('Falling back to simple dialog-based GUI. \nPlease consider installing the HexRays PyQt5 build available at \n"http://hex-rays.com/products/ida/support/download.shtml"')
     QT_AVAILABLE = False
 
 
@@ -166,7 +168,7 @@ class DbStore(object):
         List is empty for no hits
         '''
         retList = []
-        cur = self.conn.execute(sql_lookup_hash_value, (hashVal,))
+        cur = self.conn.execute(sql_lookup_hash_value, (ctypes.c_int64(hashVal).value,))
         for row in cur:
             #logger.debug("Found hits for value: %08x", hashVal)
             sym = SymbolHash(*row)
@@ -189,11 +191,8 @@ class DbStore(object):
         List is empty for no hits
         '''
         retList = []
-        # Quick n dirty fix for overlong ints for SQLite
-        if hashVal>=0xffffffff:
-            hashVal &= 0x00000000ffffffff
-            
-        cur = self.conn.execute(sql_lookup_hash_type_value, (hashVal, hashType))
+        cur = self.conn.execute(sql_lookup_hash_type_value, (ctypes.c_int64(hashVal).value, hashType))
+
         for row in cur:
             #logger.debug("Found hits for value: %08x", hashVal)
             sym = SymbolHash(*row)
@@ -212,6 +211,9 @@ class SearchParams(object):
         self.searchDwordArray = False
         self.searchPushArgs = False
         self.createStruct = False
+        self.useDecompiler = False
+        self.useXORSeed = False
+        self.XORSeed = 0
 
         #startAddr & endAddr: range to process
         if using_ida7api:
@@ -342,20 +344,44 @@ class ShellcodeHashSearcher(object):
                             opval = idc.get_operand_value(head, i)
                         else:
                             opval = idc.GetOperandValue(head, i)
+                        if self.params.useXORSeed:
+                            opval = opval ^ self.params.XORSeed
                         for h in self.params.hashTypes:
                             hits = self.dbstore.getSymbolByTypeHash(h.hashType, opval)
                             for sym in hits:
                                 logger.info("0x%08x: %s", head, str(sym))
                                 self.addHit(head, sym)
-                                self.markupLine(head, sym)
-            except Exception, err:
+                                self.markupLine(head, sym, self.params.useDecompiler)
+            except Exception as err:
                logger.exception("Exception: %s", str(err))
 
-    def markupLine(self, loc, sym):
+    def addDecompilerComment(self, loc, comment):
+        cfunc = idaapi.decompile(loc)
+        eamap = cfunc.get_eamap()
+        decompObjAddr = eamap[loc][0].ea
+        tl = idaapi.treeloc_t()
+        tl.ea = decompObjAddr
+        commentSet = False
+        for itp in range (idaapi.ITP_SEMI, idaapi.ITP_COLON):
+            tl.itp = itp
+            cfunc.set_user_cmt(tl, comment)
+            cfunc.save_user_cmts()
+            unused = cfunc.__str__()
+            if not cfunc.has_orphan_cmts():
+                commentSet = True
+                cfunc.save_user_cmts()
+                break
+            cfunc.del_orphan_cmts()
+        if not commentSet:
+            print ("pseudo comment error at %08x" % loc)
+
+    def markupLine(self, loc, sym, useDecompiler = False):
         comm = '%s!%s' % (sym.libName, sym.symbolName)
         logger.debug("Making comment @ 0x%08x: %s", loc, comm)
         if using_ida7api:
             idc.set_cmt(loc, str(comm), False)
+            if useDecompiler and idaapi.get_func(loc) != None:
+                self.addDecompilerComment(loc, str(comm))
         else:
             idc.MakeComm(loc, str(comm))
 
@@ -390,9 +416,9 @@ class SearchLauncher(object):
             logger.debug('Trying default db path: %s', dbFile)
             if not os.path.exists(dbFile):
                 if using_ida7api:
-                    dbFile = idc.AskFile(0, "*.db", "Select shellcode hash database")
-                else:
                     dbFile = idaapi.ask_file(False, "*.db", "Select shellcode hash database")
+                else:
+                    dbFile = idc.AskFile(0, "*.db", "Select shellcode hash database")
 
                 if (dbFile is None) or (not os.path.isfile(dbFile)):
                     logger.debug("No file select. Stopping now")
@@ -409,7 +435,7 @@ class SearchLauncher(object):
             logger.debug("Done")
         except RejectionException:
             logger.info('User canceled action')
-        except Exception, err:
+        except Exception as err:
             logger.exception("Exception caught: %s", str(err))
 
     def launchGuiInput(self):
@@ -442,19 +468,24 @@ class SearchLauncher(object):
         '''
         # Only run if QT not available, so not bothering with ida7 check
         hashTypes = self.dbstore.getAllHashTypes()
-        for h in hashTypes:
-            if 1 == idc.AskYN(1, str('Include hash: %s' % h.hashName)):
-                self.params.hashTypes.append(h)
         if len(self.params.hashTypes) == 0:
             raise RuntimeError('No hashes selected')
+        # we used to prompt y/n for each one. too obnoxious, just force all hashes
+        self.params.hashTypes = hashTypes
 
     def promptForSearchTypes(self):
         # Only run if QT not available, so not bothering with ida7 check
         logger.debug("Promping for search types")
-        if idc.AskYN(1, str('Search for DWORD array of hashes?')) == 1:
-            self.params.searchDwordArray = True
-        if idc.AskYN(1, str('Search for push argument hash value?')) == 1:
-            self.params.searchPushArgs = True
+        if using_ida7api:
+            if idaapi.ASKBTN_YES == idaapi.ask_yn(idaapi.ASKBTN_YES, str('Search for DWORD array of hashes?')):
+                self.params.searchDwordArray = True
+            if idaapi.ASKBTN_YES == idaapi.ask_yn(idaapi.ASKBTN_YES, str('Search for DWORD array of hashes?')):
+                self.params.searchDwordArray = True
+        else:
+            if idc.AskYN(1, str('Search for push argument hash value?')) == 1:
+                self.params.searchPushArgs = True
+            if idc.AskYN(1, str('Search for DWORD array of hashes?')) == 1:
+                self.params.searchDwordArray = True
 
         if (not self.params.searchDwordArray) and (not self.params.searchPushArgs):
             raise RuntimeError('No search types selected')

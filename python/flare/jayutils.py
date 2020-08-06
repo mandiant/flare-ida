@@ -288,7 +288,7 @@ def getInputFilepath():
         return getInputFilepath_ida7()
     filePath = idc.GetInputFilePath()
     if not os.path.exists(filePath):
-        print 'IDB input file not found. Prompting for new one: %s' % filePath
+        print ('IDB input file not found. Prompting for new one: %s' % filePath)
         filePath = idc.AskFile(False, '*.*', 'Enter path to idb input file')
         if filePath is not None:
             idc.SetInputFilePath(filePath)
@@ -299,7 +299,7 @@ def getInputFilepath_ida7():
     '''Returns None if the uesr cancels. Updates the filepath in the idb on success'''
     filePath = idc.get_input_file_path()
     if not os.path.exists(filePath):
-        print 'IDB input file not found. Prompting for new one: %s' % filePath
+        print ('IDB input file not found. Prompting for new one: %s' % filePath)
         filePath = idaapi.ask_file(False, '*.*', 'Enter path to idb input file')
         if filePath is not None:
             idc.set_root_filename(filePath)
@@ -416,7 +416,7 @@ def getAllXrefsTo(vw, va):
     try:
         op = vw.parseOpcode(lva)
     except Exception:
-        print 'Weird error while doing getAllXrefsTo: %s' % str(err)
+        print ('Weird error while doing getAllXrefsTo: %s' % str(err))
         return init
     brlist = op.getBranches()
     for tova,bflags in brlist:

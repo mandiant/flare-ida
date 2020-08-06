@@ -43,7 +43,7 @@ ACTION_NAME = 'flare:apply_callee_type'
 MENU_PATH = "Edit/Operand type/Manual"
 
 # get the IDA version number
-ida_major, ida_minor = map(int, idaapi.get_kernel_version().split("."))
+ida_major, ida_minor = list(map(int, idaapi.get_kernel_version().split(".")))
 using_ida7api = (ida_major > 6)
 
 ex_addmenu_item_ctx = None 
@@ -124,7 +124,7 @@ class apply_callee_type_plugin_t(idaapi.plugin_t):
 def PLUGIN_ENTRY():
     try:
         return apply_callee_type_plugin_t()
-    except Exception, err:
+    except Exception as err:
         import traceback
         msg("Error: %s\n%s" % (str(err), traceback.format_exc()))
         raise

@@ -39,14 +39,14 @@ import idc
 import idaapi
 import idautils
 
-import jayutils
+from . import jayutils
 
-from apply_callee_type_widget import Ui_ApplyCalleeDialog
+from .apply_callee_type_widget import Ui_ApplyCalleeDialog
 
 logger = None
 
 # get the IDA version number
-ida_major, ida_minor = map(int, idaapi.get_kernel_version().split("."))
+ida_major, ida_minor = list(map(int, idaapi.get_kernel_version().split(".")))
 using_ida7api = (ida_major > 6)
 
 MSDN_MACROS = [
@@ -57,7 +57,7 @@ MSDN_MACROS = [
 
 
 def predFunc(*args):
-    print 'Running predFunc: %s' % str(args)
+    print('Running predFunc: %s' % str(args))
 
 def manualTypeCopy(dest, destOff, destLen, src):
     '''Copies an IDA type 'string' to the given location'''
@@ -173,7 +173,7 @@ class ApplyCalleeTypeRunner(object):
         typ_sclass = ctypes.c_ulong()
         value = ctypes.c_ulong()
         ret = get_named_type(
-                long(til.this),
+                int(til.this),
                 funcname, 
                 idaapi.NTF_SYMM, 
                 ctypes.byref(typ_type),
@@ -221,8 +221,8 @@ class ApplyCalleeTypeRunner(object):
         #logger.info('Type of til: %s', type(til))
         #logger.info('Type of typ_type: %s', type(typ_type))
         ret = g_dll.deserialize_tinfo(
-            long(tinfo.this),
-            long(til.this), 
+            int(tinfo.this),
+            int(til.this), 
             ctypes.byref(typ_type), 
             ctypes.byref(typ_fields),
             ctypes.byref(typ_fieldcmts)
@@ -301,7 +301,7 @@ class ApplyCalleeTypeRunner(object):
                 ret = idaapi.set_op_tinfo2(here, 0, tinfo)
             logger.debug('set_op_tinfo2 result: %r', ret)
 
-        except Exception, err:
+        except Exception as err:
             logger.exception("Exception caught: %s", str(err))
 
 class ApplyCalleeTypeWidget(QtWidgets.QDialog):
@@ -321,7 +321,7 @@ class ApplyCalleeTypeWidget(QtWidgets.QDialog):
             self.ui.te_userTypeText.setTabChangesFocus(True)
             self.ui.pb_useStandardType.clicked.connect(self.onStandardPress)
             self.ui.pb_useLocalType.clicked.connect(self.onLocalPress)
-        except Exception, err:
+        except Exception as err:
             logger.exception('Error during init: %s', str(err))
     
     def getUserText(self):
@@ -345,9 +345,9 @@ def main():
         logger = jayutils.configLogger(__name__, logging.INFO)
         launcher = ApplyCalleeTypeRunner()
         launcher.run()
-    except Exception, err:
+    except Exception as err:
         import traceback
-        print('Error in act: %s: %s' % (str(err), traceback.format_exc()))
+        print(('Error in act: %s: %s' % (str(err), traceback.format_exc())))
 
 if __name__ == '__main__':
     main()
