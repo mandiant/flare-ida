@@ -469,10 +469,7 @@ class SearchLauncher(object):
         # Only run if QT not available, so not bothering with ida7 check
         hashTypes = self.dbstore.getAllHashTypes()
         
-		#if len(self.params.hashTypes) == 0:
-        #    raise RuntimeError('No hashes selected')
-        
-		# we used to prompt y/n for each one. too obnoxious, just force all hashes
+	# we used to prompt y/n for each one. too obnoxious, just force all hashes
         self.params.hashTypes = hashTypes
 
     def promptForSearchTypes(self):
