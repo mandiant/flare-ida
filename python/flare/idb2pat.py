@@ -156,7 +156,7 @@ def find_ref_loc(config, ea, ref):
         logger.debug("Bad parameter: ref")
         return BADADDR
 
-    if idc.GetOpType(ea, 0) == o_near:
+    if idc.get_operand_type(ea, 0) == o_near:
         ref = (ref - get_item_end(ea)) & ((1<<config.pointer_size*8)-1)
 
     if isCode(getFlags(ea)):

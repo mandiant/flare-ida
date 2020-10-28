@@ -29,17 +29,18 @@ from idaapi import get_inf_structure
 from idautils import Segments
 from idautils import XrefsTo
 
+from ida_bytes import patch_dword
+from ida_kernwin import msg
+
 from idc import BADADDR
-from idc import Dword,Qword
-from idc import GetFunctionName
-from idc import GetMnem
-from idc import GetString
-from idc import Message
-from idc import PatchDword
-from idc import SegEnd
-from idc import SegName
-from idc import XREF_USER
 from idc import dr_I
+from idc import get_func_name
+from idc import get_segm_end
+from idc import get_segm_name
+from idc import get_strlit_contents
+from idc import get_wide_dword,get_qword
+from idc import print_insn_mnem
+from idc import XREF_USER
 
 
 DWORD_SIZE=4
@@ -170,22 +171,22 @@ class ObjcClass(object):
         """
         self.arch=arch
         self.segment_map=segment_map
-        class_ro_va=Qword(objc_class_va+self.OBJC2_CLASS_RO_OFFSET)
-        self.name_pointer=Qword(class_ro_va+self.OBJC2_CLASS_RO_NAME_OFFSET)
+        class_ro_va=get_qword(objc_class_va+self.OBJC2_CLASS_RO_OFFSET)
+        self.name_pointer=get_qword(class_ro_va+self.OBJC2_CLASS_RO_NAME_OFFSET)
         self.method_list=[]
         if class_ro_va == BADADDR or class_ro_va==0:
             self.class_ro_va=None
             return
         self.class_ro_va=class_ro_va
 
-        class_methods_va=Qword(class_ro_va+self.OBJC2_CLASS_RO_BASE_METHODS_OFFSET)
+        class_methods_va=get_qword(class_ro_va+self.OBJC2_CLASS_RO_BASE_METHODS_OFFSET)
 
         if class_methods_va == BADADDR or class_methods_va==0:
             self.class_methods_va=None
             return
         self.class_methods_va=class_methods_va
-        Message("Class found at virtual address: 0x%x\n" % objc_class_va)
-        Message("Class name: %s\n" % GetString(self.name_pointer))
+        msg("Class found at virtual address: 0x%x\n" % objc_class_va)
+        msg("Class name: %s\n" % get_strlit_contents(self.name_pointer))
         #Parse the method_list_t struct and build a list of methods
         self.method_list=ObjcMethodList(class_methods_va,segment_map,arch=arch)
 
@@ -216,25 +217,25 @@ class ObjCMethodAbstract(object):
             method_va
             segment_map
         """
-        Message("Found method at virtual address: 0x%x\n" % method_va)
+        msg("Found method at virtual address: 0x%x\n" % method_va)
 
         self.method_va=method_va
         self.segment_map=segment_map
 
-        self.name_pointer=Qword(method_va)
-        self.method_type=Qword(method_va+self.OBJC_METHOD_TYPE_OFFSET)
+        self.name_pointer=get_qword(method_va)
+        self.method_type=get_qword(method_va+self.OBJC_METHOD_TYPE_OFFSET)
         self.method_pointer_va=method_va+self.OBJC_METHOD_IMP_OFFSET
-        self.method_pointer=Qword(self.method_pointer_va)
+        self.method_pointer=get_qword(self.method_pointer_va)
         self.patched_xrefs=[]
         objc_selrefs = segment_map["__objc_selrefs"]
         objc_msgrefs  = segment_map["__objc_msgrefs"]
         objc_const    = segment_map["__objc_const"]
-        Message("Method name: %s\n" % GetFunctionName(self.method_pointer))
+        msg("Method name: %s\n" % get_func_name(self.method_pointer))
         is_msg_ref,selector_ref,const_ref_count=self.get_xref(objc_selrefs,objc_msgrefs,objc_const)
         self.is_msg_ref=is_msg_ref
         self.const_ref_count=const_ref_count
         if not selector_ref:
-            Message("No selref found.\n")
+            msg("No selref found.\n")
             self.selector_ref=None
             return
         if const_ref_count == 1:
@@ -242,7 +243,7 @@ class ObjCMethodAbstract(object):
             #to the selector.
             self.selector_ref=selector_ref
         else:
-            Message("Selector ref count not exactly 1. Potentially ambiguous: %d" % const_ref_count)
+            msg("Selector ref count not exactly 1. Potentially ambiguous: %d" % const_ref_count)
             # Otherwise this same selector is used by more than one class. (Or none at all)
             self.selector_ref=None
             return
@@ -253,7 +254,7 @@ class ObjCMethodAbstract(object):
             # adjust pointer to beginning of message ref struct to get xrefs
             self.sel_ref_va-=POINTER_SIZE
 
-        Message("selref VA: 0x%X - function VA: 0x%X\n" % (self.sel_ref_va, self.method_pointer))
+        msg("selref VA: 0x%X - function VA: 0x%X\n" % (self.sel_ref_va, self.method_pointer))
         #Find all the references to this *selref* (note: not the string itself but the selref)
         #These should precede calls to the method
         #Patch the references to the selref with a reference to the method implementation
@@ -291,7 +292,7 @@ class ObjCMethodAbstract(object):
         #we're looking for cross references *to* the the address of the selref
         #If we find ones we like and replace them with a cross reference to the actual method implementation, rather than the selector
         for xref in XrefsTo(self.sel_ref_va):
-            if GetMnem(xref.frm) == self.CALL_MNEMONIC:
+            if print_insn_mnem(xref.frm) == self.CALL_MNEMONIC:
                 continue
             #We found a xref *from* somewhere *to* our selref. We need to replace that with a reference
             #To the actual method implementation
@@ -325,7 +326,7 @@ class ObjCMethodX86_64(ObjCMethodAbstract):
 
 
     def add_method_xref(self,xref):
-        Message("Adding cross reference to method implementation for %s\n" % GetFunctionName(self.method_pointer))
+        msg("Adding cross reference to method implementation for %s\n" % get_func_name(self.method_pointer))
         
         #TODO: clean this up so it's more clear how we're parsing and patching the instruction
         #TODO: handle other potential instructions that could place a method selref into a register
@@ -345,7 +346,7 @@ class ObjCMethodX86_64(ObjCMethodAbstract):
         #+3 (4th byte of the instruction)
         #is where the RIP-relative operand is that
         #will get dereferenced as a pointer
-        PatchDword(xref.frm+3,offset)
+        patch_dword(xref.frm+3,offset)
         return ObjcMethodXref(xref.frm,self.method_pointer,xref.to)
 
 
@@ -371,7 +372,7 @@ class ObjCMethodArm64(ObjCMethodAbstract):
         super(ObjCMethodArm64,self).__init__(method_va,segment_map)
 
     def add_method_xref(self,xref):
-        Message("Adding cross reference to method implementation for %s\n" % GetFunctionName(self.method_pointer))
+        msg("Adding cross reference to method implementation for %s\n" % get_func_name(self.method_pointer))
         
         add_dref(xref.frm,self.method_pointer,dr_I|XREF_USER)
 
@@ -384,7 +385,7 @@ class ObjCMethodArm64(ObjCMethodAbstract):
         
         arm64_ldr.patch_offset(offset)
 
-        PatchDword(xref.frm,arm64_ldr.instruction_int)
+        patch_dword(xref.frm,arm64_ldr.instruction_int)
         return ObjcMethodXref(xref.frm,self.method_pointer,xref.to)
 
 
@@ -421,10 +422,10 @@ class ObjcMethodList(list):
         self.walk_methods(objc_selrefs,objc_msgrefs,objc_const)
 
     def walk_methods(self,objc_selrefs,objc_msgrefs,objc_const):
-        Message("Walking methods starting at virtual address: 0x%x\n" % self.method_list_va)
+        msg("Walking methods starting at virtual address: 0x%x\n" % self.method_list_va)
         class_methods_va=self.method_list_va
         #deref the method list struct to get method count:
-        count=Dword(class_methods_va+DWORD_SIZE)
+        count=get_wide_dword(class_methods_va+DWORD_SIZE)
 
         method_size=self.ObjCMethod.OBJC_METHOD_SIZE #sizeof(struct _objc_method)
 
@@ -463,7 +464,7 @@ class ObjcMethodXref(object):
         self.frm_va=frm_va
         self.to_va=to_va
         self.old_to_va=old_to_va
-        self.method_name=GetFunctionName(self.to_va)
+        self.method_name=get_func_name(self.to_va)
 
     def __str__(self):
         return "[0x%x] --> %s"%(self.frm_va,self.method_name)
@@ -514,13 +515,13 @@ class ObjCMethodXRefs(list):
     def find_all_segments(self,segment_names):
         segments={name:None for name in segment_names}
         for seg_va in Segments():
-            seg_name=SegName(seg_va)
+            seg_name=get_segm_name(seg_va)
             if seg_name in segment_names:
-                segments[seg_name]=(seg_va,SegEnd(seg_va))
+                segments[seg_name]=(seg_va,get_segm_end(seg_va))
         return segments
 
     def walk_classes(self,segment_map):
-        Message("Walking classes\n")
+        msg("Walking classes\n")
         classes=[]
         objc_data_start,objc_data_end=segment_map["__objc_data"]
         for va in range(objc_data_start,objc_data_end,self.objc2ClassSize):
@@ -550,10 +551,10 @@ def detect_arch():
     procname=info.procName
     if bits==64 and is_le:
         if procname=="ARM":
-            Message("Detected architecture: arm64\n")
+            msg("Detected architecture: arm64\n")
             arch=ARCH_ARM64
         elif procname=="metapc":
-            Message("Detected architecture: x86_64\n")
+            msg("Detected architecture: x86_64\n")
             arch=ARCH_X86_64
 
     return arch
@@ -566,9 +567,9 @@ def detect_arch():
 def main():
     arch=detect_arch()
     xref_list=ObjCMethodXRefs(arch=arch)
-    Message("Patched the following method references:\n")
+    msg("Patched the following method references:\n")
     for xref in xref_list:
-        Message("%s\n" % str(xref))
+        msg("%s\n" % str(xref))
 
 if __name__ == '__main__':
     main()
