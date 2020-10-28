@@ -41,7 +41,6 @@ ARG_SEARCH_THRESHOLD = 0xFF  # range in where to look for arguments
 # name of enum holding NULL values and description
 NULL_ENUM_NAME = 'Null_Enum'
 
-
 g_logger = logging.getLogger(__name__)
 
 
@@ -117,17 +116,17 @@ def add_fct_descr(ea, function, rep):
         format_comment('RETURN VALUE: ' + function.returns)
     # Both functions do not return
     if rep:
-        idc.MakeRptCmt(ea, descr)
+        idc.set_cmt(ea, descr, 1)
     else:
-        idc.MakeComm(ea, descr)
+        idc.set_cmt(ea, descr, 0)
 
 
 def get_end_of_last_segment():
     """ Return the last segment's end address. """
     last_ea = 0
     for segment in idautils.Segments():
-        if idc.SegEnd(segment) > last_ea:
-            last_ea = idc.SegEnd(segment)
+        if idc.get_segm_end(segment) > last_ea:
+            last_ea = idc.get_segm_end(segment)
     return last_ea
 
 
@@ -137,14 +136,14 @@ def expand_segment(ea):
     Argument:
     ea -- effective address within last segment
     """
-    start = idc.SegStart(ea)
-    end = idc.SegEnd(ea)
+    start = idc.get_segm_start(ea)
+    end = idc.get_segm_end(ea)
     if end != get_end_of_last_segment():
         raise FailedToExpandSegmentException('Can only expand last segment.')
     if start == idaapi.BADADDR or end == idaapi.BADADDR:
         raise FailedToExpandSegmentException('Invalid start or end address.')
     new_end = end + NEW_SEGMENT_SIZE / 2
-    if not idc.SetSegBounds(ea, start, new_end, idaapi.SEGMOD_KEEP):
+    if not idc.set_segment_bounds(ea, start, new_end, idaapi.SEGMOD_KEEP):
         raise FailedToExpandSegmentException('Setting segment bounds failed.')
 
 
@@ -156,9 +155,9 @@ def get_segment_end_ea(ea):
     ea -- effective address within added segment where search starts
     """
     addr = ea
-    while idc.GetCommentEx(addr, 0) is not None:
+    while idc.get_cmt(addr, 0) is not None:
         addr = addr + 1
-    if addr > idc.SegEnd(ea):
+    if addr > idc.get_segm_end(ea):
         g_logger.debug('Address {} out of segment bounds. Expanding segment.'
                        .format(hex(addr)))
         try:
@@ -179,9 +178,9 @@ def append_segment(segment_name):
     segment_name -- the name of the segment to be added
     """
     for segment in idautils.Segments():
-        if idc.SegName(segment) == segment_name:
+        if idc.get_segm_name(segment) == segment_name:
             g_logger.warning('Segment ' + segment_name + ' already exists')
-            return idc.SegStart(segment)
+            return idc.get_segm_start(segment)
 
     new_segment_start = get_end_of_last_segment()
     g_logger.debug('Adding new segment at 0x%08x' % new_segment_start)
@@ -189,13 +188,13 @@ def append_segment(segment_name):
                       0, 1, 0, idaapi.scPub) == 1:
         raise FailedToAppendSegmentException('Could not add segment')
     # set new segment's attributes
-    if not idc.RenameSeg(new_segment_start, segment_name):
+    if not idc.set_segm_name(new_segment_start, segment_name):
         raise FailedToAppendSegmentException('Could not rename segment')
-    if not idc.SetSegClass(new_segment_start, 'DATA'):
+    if not idc.set_segm_class(new_segment_start, 'DATA'):
         raise FailedToAppendSegmentException('Could not set segment class')
-    if not idc.SegAlign(new_segment_start, idc.saRelPara):
+    if not idc.set_segm_alignment(new_segment_start, idc.saRelPara):
         raise FailedToAppendSegmentException('Could not align segment')
-    if not idc.SetSegAddressing(new_segment_start, 1):  # 1 -- 32 bit
+    if not idc.set_segm_addressing(new_segment_start, 1):  # 1 -- 32 bit
         raise FailedToAppendSegmentException(
             'Could not set segment addressing')
     return new_segment_start
@@ -238,7 +237,7 @@ def add_arg_descr(function, segment_ea, arg_description_format):
             g_logger.debug(' Adding name {} at {}'.format(name, hex(free_ea)))
             idaapi.set_name(free_ea, name)
             description = argument.description[:MAX_ARG_DESCR_LEN]
-            idc.MakeComm(free_ea, format_comment(description))
+            idc.set_cmt(free_ea, format_comment(description), 0)
         else:
             g_logger.debug(' Name %s already exists' % name)
     return (free_ea + 1)
@@ -254,14 +253,14 @@ def find_arg_ea(ea_call, arg_name):
     """
     # the search for previous instruction/data will stop at the specified
     # address (inclusive)
-    prev_instr = idc.PrevHead(ea_call, ea_call - PREVIOUS_INSTR_DELTA)
+    prev_instr = idc.prev_head(ea_call, ea_call - PREVIOUS_INSTR_DELTA)
     while prev_instr > (ea_call - ARG_SEARCH_THRESHOLD) and \
             prev_instr != idaapi.BADADDR:
         # False indicates not to look for repeatable comments
-        comment = idc.GetCommentEx(prev_instr, False)
+        comment = idc.get_cmt(prev_instr, False)
         if comment == arg_name:
             return prev_instr
-        prev_instr = idc.PrevHead(
+        prev_instr = idc.prev_head(
             prev_instr, prev_instr - PREVIOUS_INSTR_DELTA)
     raise ArgumentNotFoundException('  Argument {} not found within threshold'
                                     .format(arg_name))
@@ -284,9 +283,9 @@ def add_enums(function):
             for enum in argument.enums:
                 g_logger.debug('  Importing enum %s for argument %s' %
                                (enum, argument.name))
-                if idc.Til2Idb(-1, enum) != idaapi.BADADDR:
+                if idc.import_type(-1, enum) != idaapi.BADADDR:
                     g_logger.debug('  ' + enum + ' ' +
-                                   hex(idc.GetEnum(enum)) +
+                                   hex(idc.get_enum(enum)) +
                                    ' added successfully')
                     enum_count = enum_count + 1
                 else:
@@ -308,17 +307,17 @@ def add_enums(function):
                 constant.name = 'NULL_{}_{}'.format(argument.name,
                                                     function.name)
                 # Add custom enum for NULL values if it does not exist yet
-                enumid = idc.GetEnum(NULL_ENUM_NAME)
+                enumid = idc.get_enum(NULL_ENUM_NAME)
                 if enumid == idaapi.BADADDR:
-                    enumid = idc.AddEnum(-1, NULL_ENUM_NAME, idaapi.hexflag())
-                idc.AddConstEx(enumid, constant.name, 0, -1)
-                constid = idc.GetConstByName(constant.name)
-                idc.SetConstCmt(constid, format_comment(constant.description),
+                    enumid = idc.add_enum(-1, NULL_ENUM_NAME, idaapi.hex_flag())
+                idc.add_enum_member(enumid, constant.name, 0, -1)
+                constid = idc.get_enum_member_by_name(constant.name)
+                idc.set_enum_member_cmt(constid, format_comment(constant.description),
                                 False)
             else:
-                constid = idc.GetConstByName(constant.name)
+                constid = idc.get_enum_member_by_name(constant.name)
                 if constid:
-                    if idc.SetConstCmt(constid,
+                    if idc.set_enum_member_cmt(constid,
                                        format_comment(constant.description),
                                        False):
                         g_logger.debug('    Description added for %s' %
@@ -332,21 +331,21 @@ def add_enums(function):
 def get_bitmasks(enumid):
     """ Return list of bitmasks used in enum. """
     bmasks = []
-    bid = idc.GetFirstBmask(enumid)
+    bid = idc.get_first_bmask(enumid)
     while bid != idaapi.BADADDR:
         bmasks.append(bid)
-        bid = idc.GetNextBmask(enumid, bid)
+        bid = idc.get_next_bmask(enumid, bid)
     return bmasks
 
 
 def get_constant_id(enumid, value):
     """ Return id of constant for specific value in enum. """
-    constid = idc.GetConstEx(enumid, value, 0, -1)
-    if constid != idaapi.BADADDR and not idc.IsBitfield(enumid):
+    constid = idc.get_enum_member(enumid, value, 0, -1)
+    if constid != idaapi.BADADDR and not idc.is_bf(enumid):
         return constid
 
     for bm in get_bitmasks(enumid):
-        constid = idc.GetConstEx(enumid, value, 0, bm)
+        constid = idc.get_enum_member(enumid, value, 0, bm)
         if constid != idaapi.BADADDR:
             return constid
     return idaapi.BADADDR
@@ -354,7 +353,7 @@ def get_constant_id(enumid, value):
 
 def rename_constant(arg_ea, fct_name, arg_name, arg_enums):
     """ Rename constants to values from standard enumerations. """
-    instruction = idc.GetMnem(arg_ea)
+    instruction = idc.print_insn_mnem(arg_ea)
     if instruction == 'push':
         op_num = 0
     elif instruction == 'mov':
@@ -363,38 +362,38 @@ def rename_constant(arg_ea, fct_name, arg_name, arg_enums):
         raise RenamingException('Constant: unhandled instruction ' +
                                 instruction)
 
-    op_val = idc.GetOperandValue(arg_ea, op_num)
+    op_val = idc.get_operand_value(arg_ea, op_num)
     # NULL
     if op_val == 0:
-        targetid = idc.GetConstByName('NULL_{}_{}'.format(arg_name, fct_name))
+        targetid = idc.get_enum_member_by_name('NULL_{}_{}'.format(arg_name, fct_name))
         serial = 0
-        enumid = idc.GetEnum(NULL_ENUM_NAME)
-        constid = idc.GetConstEx(enumid, 0, serial, -1)
+        enumid = idc.get_enum(NULL_ENUM_NAME)
+        constid = idc.get_enum_member(enumid, 0, serial, -1)
         while constid != idaapi.BADADDR:
             if constid == targetid:
-                idc.OpEnumEx(arg_ea, op_num, enumid, serial)
+                idc.op_enum(arg_ea, op_num, enumid, serial)
                 return
             serial = serial + 1
-            constid = idc.GetConstEx(enumid, 0, serial, -1)
+            constid = idc.get_enum_member(enumid, 0, serial, -1)
 
     # All other constants
-    op_type = idc.GetOpType(arg_ea, op_num)
+    op_type = idc.get_operand_type(arg_ea, op_num)
     if op_type == idaapi.o_imm:
         # only one choice
         if len(arg_enums) == 1:
-            enumid = idc.GetEnum(arg_enums[0])
-            idc.OpEnumEx(arg_ea, op_num, enumid, 0)
+            enumid = idc.get_enum(arg_enums[0])
+            idc.op_enum(arg_ea, op_num, enumid, 0)
             return
 
         for enum in arg_enums:
-            enumid = idc.GetEnum(enum)
+            enumid = idc.get_enum(enum)
             constid = get_constant_id(enumid, op_val)
             if constid == idaapi.BADADDR:
                 # Not in this enum
                 continue
             else:
                 # Found the right enum
-                idc.OpEnumEx(arg_ea, op_num, enumid, 0)
+                idc.op_enum(arg_ea, op_num, enumid, 0)
                 return
 
 
@@ -406,7 +405,7 @@ def rename_argument(ea, function, argument, arg_description_format):
         "argument_name": argument.name,
     }
     new_arg = arg_description_format.format(**fields).encode('utf-8')
-    idc.MakeComm(ea, new_arg)
+    idc.set_cmt(ea, new_arg, 0)
 
 
 def rename_args_and_consts(ref, function, conf_constants_import,
@@ -438,13 +437,13 @@ def rename_args_and_consts(ref, function, conf_constants_import,
 def backup_database():
     """ Backup the database to a file similar to IDA's snapshot function. """
     time_string = strftime('%Y%m%d%H%M%S')
-    file = idc.GetInputFile()
+    file = idc.get_root_filename()
     if not file:
         raise NoInputFileException('No input file provided')
     input_file = rsplit(file, '.', 1)[0]
     backup_file = '%s_%s.idb' % (input_file, time_string)
     g_logger.info('Backing up database to file ' + backup_file)
-    idc.SaveBase(backup_file, idaapi.DBFL_BAK)
+    idc.save_database(backup_file, idaapi.DBFL_BAK)
 
 
 def get_data_files(dir):
