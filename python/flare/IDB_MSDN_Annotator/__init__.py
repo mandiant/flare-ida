@@ -19,17 +19,15 @@ permissions and limitations under the License.
 """
 
 import os.path
-import sys
-from string import rsplit
-from textwrap import fill
-from time import strftime
 import logging
 import idc
 import idautils
 import idaapi
-import xml_parser
+from textwrap import fill
+from time import strftime
+import IDB_MSDN_Annotator.xml_parser
 
-CREATE_BACKUP = True # indicate if a backup should be created
+CREATE_BACKUP = True  # indicate if a backup should be created
 # The file should be located in the the MSDN_data directory
 MSDN_INFO_FILE = 'msdn_data.xml'
 NEW_SEGMENT_SIZE = 0x800  # size of the new segment
@@ -42,6 +40,7 @@ ARG_SEARCH_THRESHOLD = 0xFF  # range in where to look for arguments
 NULL_ENUM_NAME = 'Null_Enum'
 
 g_logger = logging.getLogger(__name__)
+g_logger.setLevel(logging.DEBUG)
 
 
 class FailedToExpandSegmentException(Exception):
@@ -95,13 +94,13 @@ def get_imports(library_calls, library_addr):
     """ Populate dictionaries with import information. """
     import_names_callback = make_import_names_callback(library_calls,
                                                        library_addr)
-    for i in xrange(0, idaapi.get_import_module_qty()):
+    for i in range(0, idaapi.get_import_module_qty()):
         idaapi.enum_import_names(i, import_names_callback)
 
 
 def format_comment(comment_string, width=COMMENT_MAX_WIDTH):
     """ Return UTF encoded string limited to 'width' characters per line. """
-    return fill(comment_string, width).encode('utf-8')
+    return str(fill(comment_string, width))
 
 
 def add_fct_descr(ea, function, rep):
@@ -232,7 +231,7 @@ def add_arg_descr(function, segment_ea, arg_description_format):
             "function_dll":  function.dll,
             "argument_name": argument.name,
         }
-        name = arg_description_format.format(**fields).encode('utf-8')
+        name = arg_description_format.format(**fields)
         if not name_exists(name):
             g_logger.debug(' Adding name {} at {}'.format(name, hex(free_ea)))
             idaapi.set_name(free_ea, name)
@@ -295,13 +294,11 @@ def add_enums(function):
             # No constants for this argument
             continue
 
-        argument.name = argument.name.encode('utf-8')
-        function.name = function.name.encode('utf-8')
+        argument.name = argument.name
+        function.name = function.name
 
         # Add constant descriptions
         for constant in argument.constants:
-            constant.name = constant.name.encode('utf-8')
-
             if constant.name == 'NULL':
                 # Create unique name, so we can add descriptive comment to it
                 constant.name = 'NULL_{}_{}'.format(argument.name,
@@ -309,17 +306,19 @@ def add_enums(function):
                 # Add custom enum for NULL values if it does not exist yet
                 enumid = idc.get_enum(NULL_ENUM_NAME)
                 if enumid == idaapi.BADADDR:
-                    enumid = idc.add_enum(-1, NULL_ENUM_NAME, idaapi.hex_flag())
+                    enumid = idc.add_enum(-1, NULL_ENUM_NAME,
+                                          idaapi.hex_flag())
                 idc.add_enum_member(enumid, constant.name, 0, -1)
                 constid = idc.get_enum_member_by_name(constant.name)
                 idc.set_enum_member_cmt(constid, format_comment(constant.description),
-                                False)
+                                        False)
             else:
                 constid = idc.get_enum_member_by_name(constant.name)
                 if constid:
                     if idc.set_enum_member_cmt(constid,
-                                       format_comment(constant.description),
-                                       False):
+                                               format_comment(
+                                                   constant.description),
+                                               False):
                         g_logger.debug('    Description added for %s' %
                                        constant.name)
                     else:
@@ -365,7 +364,8 @@ def rename_constant(arg_ea, fct_name, arg_name, arg_enums):
     op_val = idc.get_operand_value(arg_ea, op_num)
     # NULL
     if op_val == 0:
-        targetid = idc.get_enum_member_by_name('NULL_{}_{}'.format(arg_name, fct_name))
+        targetid = idc.get_enum_member_by_name(
+            'NULL_{}_{}'.format(arg_name, fct_name))
         serial = 0
         enumid = idc.get_enum(NULL_ENUM_NAME)
         constid = idc.get_enum_member(enumid, 0, serial, -1)
@@ -404,7 +404,7 @@ def rename_argument(ea, function, argument, arg_description_format):
         "function_dll":  function.dll,
         "argument_name": argument.name,
     }
-    new_arg = arg_description_format.format(**fields).encode('utf-8')
+    new_arg = str(arg_description_format.format(**fields).encode('utf-8'))
     idc.set_cmt(ea, new_arg, 0)
 
 
@@ -440,7 +440,7 @@ def backup_database():
     file = idc.get_root_filename()
     if not file:
         raise NoInputFileException('No input file provided')
-    input_file = rsplit(file, '.', 1)[0]
+    input_file = file.rsplit('.', 1)[0]
     backup_file = '%s_%s.idb' % (input_file, time_string)
     g_logger.info('Backing up database to file ' + backup_file)
     idc.save_database(backup_file, idaapi.DBFL_BAK)
@@ -483,7 +483,7 @@ def parse_xml_data_files(msdn_data_dir):
         additional_functions = xml_parser.parse(xml_file)
 
         # Merge functions or add new function
-        for a_function in additional_functions:
+        for a_function in additional_functions.iter():
             if a_function.name in functions_map:
                 functions_map[a_function.name].merge(a_function)
             else:
@@ -510,12 +510,14 @@ def main(config=None):
         config['functions_repeatable_comment'] = False
         config['arguments_annotate'] = True
         config['constants_import'] = True
-        config['msdn_data_dir'] = os.path.abspath(os.path.join(idaapi.get_user_idadir(), 'MSDN_data'))
+        config['msdn_data_dir'] = os.path.abspath(
+            os.path.join(idaapi.get_user_idadir(), 'MSDN_data'))
 
     # Parse XML files and populate dictionary
-    msdn_data_dir = config['msdn_data_dir'] 
+    msdn_data_dir = config['msdn_data_dir']
     if not os.path.exists(msdn_data_dir):
-        g_logger.error('Configured msdn data directory does not exist: %s', msdn_data_dir)
+        g_logger.error(
+            'Configured msdn data directory does not exist: %s', msdn_data_dir)
         return
     functions_map = parse_xml_data_files(msdn_data_dir)
 
@@ -535,7 +537,7 @@ def main(config=None):
 
     g_logger.debug('Starting annotations')
     functions_not_found = []
-    for fct_name, eas in library_calls.iteritems():
+    for fct_name, eas in library_calls.items():
         if fct_name not in functions_map:
             # sometimes function info is available, but the import is more
             # specific, e.g., lstrcat vs. lstrcatA/W
@@ -578,16 +580,17 @@ def main(config=None):
                                    config['arg_description_format'])
 
     # Report
-    print '\n======================'
-    print 'MSDN Annotator SUMMARY'
-    print '======================'
-    print ' Functions not found'
-    print ' -------------------'
+    logging.info('\n======================')
+    logging.info('MSDN Annotator SUMMARY')
+    logging.info('======================')
+    logging.info(' Functions not found')
+    logging.info(' -------------------')
     i = 1
     for f in functions_not_found:
-        print '  {}\t{}'.format(i, f)
+        logging.info('  {}\t{}'.format(i, f))
         i += 1
-    print ''
+    logging.info('')
+
 
 if __name__ == '__main__':
     main()
