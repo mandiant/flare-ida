@@ -40,7 +40,6 @@ ARG_SEARCH_THRESHOLD = 0xFF  # range in where to look for arguments
 NULL_ENUM_NAME = 'Null_Enum'
 
 g_logger = logging.getLogger(__name__)
-g_logger.setLevel(logging.DEBUG)
 
 
 class FailedToExpandSegmentException(Exception):
