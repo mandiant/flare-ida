@@ -161,7 +161,7 @@ def main():
             # print stackstrings found in this function
             f_ss = list(filter(lambda s: s.fva == fva, userData["stackstrings"]))
             cnt_found_ss += len(f_ss)
-            for ss in sorted(f_ss, key=lambda s: s.written_at):
+            for ss in sorted(f_ss, key=lambda s: s.written_at or 0):
                 print_string(ss.fva, ss.written_at, ss.offset, ss.s)
                 # IMPROVEMENT adjust stack frame member size in IDA view
 
@@ -169,7 +169,7 @@ def main():
             f_gs = list(filter(lambda g: g.fva == fva, userData["globalstrings"]))
             cnt_found_ss += len(f_gs)
             for gs in sorted(f_gs, key=lambda g: g.written_at):
-                print_string(gs.fva, gs.written_at, gs.offset, gs.s)
+                print_string(gs.fva, gs.written_at, gs.offset, gs.s or 0)
 
             if COMMENT_STACKSTRINGS:
                 for ss in f_ss:
