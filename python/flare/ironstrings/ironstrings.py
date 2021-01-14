@@ -168,8 +168,8 @@ def main():
             # print globalstrings found in this function
             f_gs = list(filter(lambda g: g.fva == fva, userData["globalstrings"]))
             cnt_found_ss += len(f_gs)
-            for gs in sorted(f_gs, key=lambda g: g.written_at):
-                print_string(gs.fva, gs.written_at, gs.offset, gs.s or 0)
+            for gs in sorted(f_gs, key=lambda g: g.written_at or 0):
+                print_string(gs.fva, gs.written_at, gs.offset, gs.s)
 
             if COMMENT_STACKSTRINGS:
                 for ss in f_ss:
