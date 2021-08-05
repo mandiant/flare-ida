@@ -56,6 +56,15 @@ logger = jayutils.configLogger('shellcode_hash', logging.INFO)
 class RejectionException(Exception):
     pass
 
+if using_ida7api:
+    import ida_ua
+    OPERAND_MASK = {
+        ida_ua.dt_byte:                0xFF,  # 1 byte
+        ida_ua.dt_word:              0xFFFF,  # 2 bytes
+        ida_ua.dt_dword:         0xFFFFFFFF,  # 4 bytes
+        ida_ua.dt_qword: 0xFFFFFFFFFFFFFFFF,  # 8 bytes
+    }
+
 ############################################################
 # SQL queries
 ############################################################
@@ -342,6 +351,9 @@ class ShellcodeHashSearcher(object):
                     if t == idc.o_imm:
                         if using_ida7api:
                             opval = idc.get_operand_value(head, i)
+                            insn = idautils.DecodeInstruction(head)
+                            opmask = OPERAND_MASK[insn.ops[i].dtype]
+                            opval = opval & opmask
                         else:
                             opval = idc.GetOperandValue(head, i)
                         if self.params.useXORSeed:
