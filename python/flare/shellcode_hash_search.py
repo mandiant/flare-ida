@@ -352,8 +352,9 @@ class ShellcodeHashSearcher(object):
                         if using_ida7api:
                             opval = idc.get_operand_value(head, i)
                             insn = idautils.DecodeInstruction(head)
-                            opmask = OPERAND_MASK[insn.ops[i].dtype]
-                            opval = opval & opmask
+                            opmask = OPERAND_MASK.get(insn.ops[i].dtype)
+                            if opmask:
+                                opval = opval & opmask
                         else:
                             opval = idc.GetOperandValue(head, i)
                         if self.params.useXORSeed:
