@@ -18,11 +18,10 @@ implied. See the License for the specific language governing
 permissions and limitations under the License.
 """
 
-import sys
+import os
 import logging
-import traceback
-import ConfigParser
-from ConfigParser import SafeConfigParser
+import idaapi
+from configparser import ConfigParser
 from PyQt5 import QtWidgets
 from PyQt5 import QtGui
 from PyQt5 import QtCore
@@ -30,14 +29,14 @@ from PyQt5.QtCore import Qt
 
 idaapi.require("IDB_MSDN_Annotator")
 
-
 CONFIG_FILE = 'MSDN_annotations.cfg'
-
 
 g_logger = logging.getLogger(__name__)
 
+
 def getDefaultMsdnDataDir():
     return os.path.abspath(os.path.join(idaapi.get_user_idadir(), 'MSDN_data'))
+
 
 class MSDNAnnotationDialog(QtWidgets.QDialog):
 
@@ -58,40 +57,52 @@ class MSDNAnnotationDialog(QtWidgets.QDialog):
 
         else:
             # Read existing
-            config['functions_annotate'] = self.config_parser.getboolean('Functions', 'annotate')
-            config['functions_repeatable_comment'] = self.config_parser.getboolean('Functions', 'repeatable_comment')
-            config['arguments_annotate'] = self.config_parser.getboolean('Arguments', 'annotate')
-            config['constants_import'] = self.config_parser.getboolean('Constants', 'import')
+            config['functions_annotate'] = self.config_parser.getboolean(
+                'Functions', 'annotate')
+            config['functions_repeatable_comment'] = self.config_parser.getboolean(
+                'Functions', 'repeatable_comment')
+            config['arguments_annotate'] = self.config_parser.getboolean(
+                'Arguments', 'annotate')
+            config['constants_import'] = self.config_parser.getboolean(
+                'Constants', 'import')
             try:
-                config['msdn_data_dir'] = self.config_parser.get('Constants', 'msdn_data_dir')
+                config['msdn_data_dir'] = self.config_parser.get(
+                    'Constants', 'msdn_data_dir')
             except ConfigParser.NoOptionError:
                 config['msdn_data_dir'] = getDefaultMsdnDataDir()
 
         return config
 
     def save_config(self):
-        self.config_parser.set('Functions', 'annotate', str(self.chkFunctionsAnnotate.isChecked()))
-        self.config_parser.set('Functions', 'repeatable_comment', str(self.chkFuntcsRepeatable.isChecked()))
-        self.config_parser.set('Arguments', 'annotate', str(self.chkArgumentsAnnotate.isChecked()))
-        self.config_parser.set('Constants', 'import', str(self.chkConstantsImport.isChecked()))
-        self.config_parser.set('Constants', 'msdn_data_dir', str(self.dirText.text()) )
+        self.config_parser.set('Functions', 'annotate', str(
+            self.chkFunctionsAnnotate.isChecked()))
+        self.config_parser.set('Functions', 'repeatable_comment', str(
+            self.chkFuntcsRepeatable.isChecked()))
+        self.config_parser.set('Arguments', 'annotate', str(
+            self.chkArgumentsAnnotate.isChecked()))
+        self.config_parser.set('Constants', 'import', str(
+            self.chkConstantsImport.isChecked()))
+        self.config_parser.set(
+            'Constants', 'msdn_data_dir', str(self.dirText.text()))
 
-        with open(self.file_path, 'wb') as conffile:
+        with open(self.file_path, 'w') as conffile:
             self.config_parser.write(conffile)
 
     def change_image(self):
         funct = self.chkFunctionsAnnotate.isChecked() and \
             self.chkFuntcsRepeatable.isChecked()
         image = "{}-{}-{}.png".format(int(funct),
-                                          int(self.chkArgumentsAnnotate
+                                      int(self.chkArgumentsAnnotate
                                               .isChecked()),
-                                          int(self.chkConstantsImport
+                                      int(self.chkConstantsImport
                                               .isChecked()))
-        img_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'IDB_MSDN_Annotator', 'img'))
+        img_path = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), 'IDB_MSDN_Annotator', 'img'))
         self.pic.setPixmap(QtGui.QPixmap(os.path.join(img_path, image)))
 
     def on_select_dir(self):
-        msdnDir = QtWidgets.QFileDialog.getExistingDirectory(caption='Select directory containing MSDN XML Database')
+        msdnDir = QtWidgets.QFileDialog.getExistingDirectory(
+            caption='Select directory containing MSDN XML Database')
         if len(msdnDir) != 0:
             self.dirText.setText(msdnDir)
 
@@ -101,13 +112,15 @@ class MSDNAnnotationDialog(QtWidgets.QDialog):
         self.change_image()
 
     def on_ok_button(self):
-        #test the msdn data dir
+        # test the msdn data dir
 
-        msdnpath = os.path.join(self.dirText.text(), IDB_MSDN_Annotator.MSDN_INFO_FILE)
+        msdnpath = os.path.join(self.dirText.text(),
+                                IDB_MSDN_Annotator.MSDN_INFO_FILE)
         if not os.path.exists(msdnpath):
             g_logger.info('Error - no msdn info file: %s', msdnpath)
-            ret = QtWidgets.QMessageBox.warning(self, 'MSDN Info Not Found', 'The file %s was not found in the specified MSDN Data Directory' % IDB_MSDN_Annotator.MSDN_INFO_FILE, QtWidgets.QMessageBox.Ok)
-            #self.done(QtWidgets.QDialog.Rejected)
+            ret = QtWidgets.QMessageBox.warning(
+                self, 'MSDN Info Not Found', 'The file %s was not found in the specified MSDN Data Directory' % IDB_MSDN_Annotator.MSDN_INFO_FILE, QtWidgets.QMessageBox.Ok)
+            # self.done(QtWidgets.QDialog.Rejected)
             return
 
         self.done(QtWidgets.QDialog.Accepted)
@@ -140,16 +153,16 @@ class MSDNAnnotationDialog(QtWidgets.QDialog):
         layout1 = QtWidgets.QVBoxLayout()
         groupBox = QtWidgets.QGroupBox('Markup Options')
         self.chkFunctionsAnnotate = QtWidgets.QCheckBox("Annotate function names"
-                                                    " (see note)")
+                                                        " (see note)")
         layout1.addWidget(self.chkFunctionsAnnotate)
         self.chkFuntcsRepeatable = QtWidgets.QCheckBox("Use repeatable comments "
-                                                   "for function name "
-                                                   "annotations")
+                                                       "for function name "
+                                                       "annotations")
         layout1.addWidget(self.chkFuntcsRepeatable)
 
         # Arguments
         self.chkArgumentsAnnotate = QtWidgets.QCheckBox("Annotate function "
-                                                    "arguments (see note)")
+                                                        "arguments (see note)")
         layout1.addWidget(self.chkArgumentsAnnotate)
 
         # Constants
@@ -159,7 +172,7 @@ class MSDNAnnotationDialog(QtWidgets.QDialog):
         groupBox.setLayout(layout1)
         layout.addWidget(groupBox)
 
-        #MSDN data dir
+        # MSDN data dir
         hlayout = QtWidgets.QHBoxLayout()
         self.selectDirButton = QtWidgets.QPushButton('...')
         self.selectDirButton.clicked.connect(self.on_select_dir)
@@ -188,7 +201,7 @@ class MSDNAnnotationDialog(QtWidgets.QDialog):
         button_ok = QtWidgets.QPushButton('&OK')
         button_ok.setDefault(True)
         button_ok.clicked.connect(self.on_ok_button)
-        #button_ok.clicked.connect(self.close)
+        # button_ok.clicked.connect(self.close)
         layout.addWidget(button_ok)
         button_cancel = QtWidgets.QPushButton('&Cancel')
         button_cancel.clicked.connect(self.close)
@@ -209,7 +222,7 @@ class MSDNAnnotationDialog(QtWidgets.QDialog):
         # Setup layouts
         h_layout = QtWidgets.QHBoxLayout()
         h_layout.addLayout(layout)
-        #h_layout.addLayout(layout_r)
+        # h_layout.addLayout(layout_r)
         h_layout.addWidget(groupBox)
         self.setLayout(h_layout)
 
@@ -218,12 +231,13 @@ class MSDNAnnotationDialog(QtWidgets.QDialog):
                                          self.__class__.__name__)
         self._logger.debug('Starting UI')
         QtWidgets.QDialog.__init__(self, parent, QtCore.Qt.WindowSystemMenuHint |
-                               QtCore.Qt.WindowTitleHint)
+                                   QtCore.Qt.WindowTitleHint)
         self.setWindowTitle("MSDN Annotations Configuration")
 
         # Parse configuration file to dictionary
-        self.file_path = os.path.abspath(os.path.join(idaapi.get_user_idadir(), CONFIG_FILE))
-        self.config_parser = SafeConfigParser()
+        self.file_path = os.path.abspath(
+            os.path.join(idaapi.get_user_idadir(), CONFIG_FILE))
+        self.config_parser = ConfigParser()
         self.config_parser.read(self.file_path)
         self.config = self.read_config()
 
@@ -231,7 +245,7 @@ class MSDNAnnotationDialog(QtWidgets.QDialog):
 
 
 if __name__ == '__main__':
-    #logging.basicConfig(level=logging.DEBUG)
+    # logging.basicConfig(level=logging.DEBUG)
     logging.basicConfig(level=logging.INFO)
 
     dlg = MSDNAnnotationDialog()

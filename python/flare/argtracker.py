@@ -184,7 +184,7 @@ class TrackerState(object):
         #we found a temp value tracing backwards, but need to determine if it's a constant
         # or if we need to continue tracing backwards. basically as long as it's not
         # a register, we stop?
-        mnem = idc.GetMnem(pc)
+        mnem = idc.print_insn_mnem(pc)
         srcOpIdx = 0
         if mnem.startswith('push'):
             srcOpIdx = 0
@@ -198,10 +198,10 @@ class TrackerState(object):
             return
 
         #process data movements instructions:
-        optype = idc.GetOpType(pc, srcOpIdx)
+        optype = idc.get_operand_type(pc, srcOpIdx)
         if optype == idc.o_reg:
             #need to trace the new reg now
-            newReg = idc.GetOpnd(pc, srcOpIdx)
+            newReg = idc.print_operand(pc, srcOpIdx)
             #self.tracker.logger.debug('writelog 0x%08x tracing: (%s): %s', pc, self.getArgNameRep(argName), newReg)
             self.tempMapping[newReg] = argName
         else:
@@ -251,7 +251,7 @@ class TrackerState(object):
                 #modified reg isn't interesting: either a function arg or a temp traced value
                 #self.tracker.logger.debug('regmon 0x%08x: not interesting: %s', cVa, reg)
                 continue
-            mnem = idc.GetMnem(cVa)
+            mnem = idc.print_insn_mnem(cVa)
             argName = reg
             if interesting1:
                 self.regs.remove(reg)
@@ -266,9 +266,9 @@ class TrackerState(object):
                 #self.tracker.logger.debug('regmon 0x%08x tracing (pop): %s (%s): 0x%x', cVa, argName, reg, readVa)
                 self.tempMapping[readVa] = argName
             elif mnem.startswith('mov'):
-                if idc.GetOpType(cVa, 1) == idc.o_reg:
+                if idc.get_operand_type(cVa, 1) == idc.o_reg:
                     #change to track this reg backwards
-                    newReg = idc.GetOpnd(cVa, 1)
+                    newReg = idc.print_operand(cVa, 1)
                     #self.tracker.logger.debug('regmon 0x%08x tracing (mov): %s (%s)', cVa, argName, newReg)
                     self.tempMapping[newReg] = argName
                 else:
@@ -337,7 +337,7 @@ class ArgTracker(object):
         #if func is None:
         #    self.logger.error('Could not get function start from vw 0x%08x -> has analysis been done???', va)
         #    return []
-        funcStart = idc.GetFunctionAttr(va, idc.FUNCATTR_START)
+        funcStart = idc.get_func_attr(va, idc.FUNCATTR_START)
         #if func != funcStart:
         #    self.logger.error('IDA & vivisect disagree over function start. Needs to be addressed before process')
         #    self.logger.error(' IDA: 0x%08x. vivisect: 0x%08x', funcStart, func)
@@ -369,7 +369,7 @@ class ArgTracker(object):
         return self.analyzeTracker(baseEntry, va, num, regs)
 
     def analyzeTracker(self, baseEntry, va, num, regs):
-        funcStart = idc.GetFunctionAttr(va, idc.FUNCATTR_START)
+        funcStart = idc.get_func_attr(va, idc.FUNCATTR_START)
         initState = TrackerState(self, baseEntry, num, regs)
         count = 0
         ret = []
@@ -428,7 +428,7 @@ def main():
     tracker = ArgTracker(vw)
 
     import idautils
-    funcEa = idc.LocByName('CreateThread')
+    funcEa = idc.get_name_ea_simple('CreateThread')
     if funcEa == idc.BADADDR:
         logger.info('CreateThread not found. Returning now')
         return

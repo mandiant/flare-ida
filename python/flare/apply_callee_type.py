@@ -244,7 +244,7 @@ class ApplyCalleeTypeRunner(object):
             if using_ida7api:
                 mnem = idc.print_insn_mnem(here)
             else:
-                mnem =  idc.GetMnem(here)
+                mnem =  idc.print_insn_mnem(here)
             if not mnem.startswith('call'):
                 logger.info('Not running at a call instruction. Bailing out now')
                 return
@@ -252,7 +252,7 @@ class ApplyCalleeTypeRunner(object):
             if using_ida7api:
                 optype = idc.get_operand_type(here, 0) 
             else:
-                optype = idc.GetOpType(here, 0) 
+                optype = idc.get_operand_type(here, 0) 
             if optype == idc.o_near:
                 logger.info("Cannot (or shouldn't) run when call optype is o_near")
                 return

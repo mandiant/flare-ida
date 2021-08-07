@@ -10,8 +10,6 @@ Based on zynamics' code at
 https://code.google.com/p/zynamics/source/browse/?repo=msdn-ida-plugin
 """
 
-import os.path
-import sys
 import xml.sax.handler
 import itertools
 import logging
@@ -31,7 +29,8 @@ class Argument:
         self.description = ""
         self.constants = []
         self.enums = []
-        self._logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._logger = logging.getLogger(
+            __name__ + '.' + self.__class__.__name__)
 
     def __str__(self):
         return ("(%s, %s): %s" % (self.name, self.enums, self.description)).encode("ISO-8859-1")
@@ -44,7 +43,7 @@ class Argument:
             if const.name == name:
                 return const
         return None
-        
+
     def merge(self, new_argument):
         if self.name != new_argument.name:
             return
@@ -57,13 +56,14 @@ class Argument:
                 current_const = self.get_constant(constant.name)
                 if not current_const:
                     # Constant not in list yet
-                    self._logger.debug('   Adding new constant ' + constant.name)
+                    self._logger.debug(
+                        '   Adding new constant ' + constant.name)
                     self.constants.append(constant)
                     continue
                 # Constant possibly needs to be updated
                 current_const.merge(constant)
         if new_argument.enums:
-            self._logger.debug('   Merging argument enums, resulting in [' + \
+            self._logger.debug('   Merging argument enums, resulting in [' +
                                ', '.join(self.enums) + ']')
             self.enums += new_argument.enums
 
@@ -74,7 +74,8 @@ class Constant:
         self.name = ""
         self.value = ""
         self.description = ""
-        self._logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._logger = logging.getLogger(
+            __name__ + '.' + self.__class__.__name__)
 
     def __str__(self):
         return ("(%s, %s)" % (self.name, self.value)).encode("ISO-8859-1")
@@ -94,6 +95,7 @@ class Constant:
             self._logger.debug('    Overwriting constant description')
             self.description = new_constant.description
 
+
 class Function:
 
     def __init__(self):
@@ -102,7 +104,8 @@ class Function:
         self.description = ""
         self.arguments = []
         self.returns = ""
-        self._logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._logger = logging.getLogger(
+            __name__ + '.' + self.__class__.__name__)
 
     def __str__(self):
         return ("%s -- %s" % (self.name, self.arguments)).encode("ISO-8859-1")
@@ -115,7 +118,7 @@ class Function:
             if arg.name == name:
                 return arg
         return None
-        
+
     def merge(self, new_function):
         """
         Merge two function objects. Information found in the second function
@@ -126,21 +129,23 @@ class Function:
         """
         if self.name != new_function.name:
             return
-        
+
         self._logger.debug('Merging function ' + self.name)
         if new_function.dll:
             self._logger.debug(' Overwriting DLL info')
-            self.dll = new_function
+            self.dll = str(new_function)
         if new_function.description:
             self._logger.debug(' Overwriting function description')
-            self.description = new_function.description
+            self.description = str(new_function.description)
         if new_function.arguments:
             for arg in new_function.arguments:
+                arg = str(arg)
                 self._logger.debug('  Working on argument ' + arg.name)
                 current_arg = self.get_argument(arg.name)
                 if not current_arg:
                     # Argument not in list yet
-                    self._logger.debug('  Adding argument ' + arg.name + ' to arguments')
+                    self._logger.debug(
+                        '  Adding argument ' + arg.name + ' to arguments')
                     self.arguments.append(arg)
                     continue
                 # Argument possibly needs to be updated
@@ -172,7 +177,8 @@ class FunctionHandler(xml.sax.handler.ContentHandler):
         self.mapping = {}
         self.current_step = 0
         self.functions = []
-        self._logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._logger = logging.getLogger(
+            __name__ + '.' + self.__class__.__name__)
 
     def startElement(self, name, attributes):
         if name == "msdn":
@@ -210,7 +216,7 @@ class FunctionHandler(xml.sax.handler.ContentHandler):
             self.current_step = FunctionHandler.IN_CONSTANTS
             self.current_argument.enums = []
             if "enums" in attributes.getNames():
-                enums = attributes.getValue('enums').encode('utf-8')
+                enums = attributes.getValue('enums')
                 if enums:
                     self.current_argument.enums = enums.split(',')
         elif name == "returns":
@@ -264,7 +270,8 @@ class FunctionHandler(xml.sax.handler.ContentHandler):
 
 
 g_logger = logging.getLogger(__name__)
-            
+
+
 def parse(xmlfile):
     """
     Return parsed MSDN information.
@@ -278,7 +285,7 @@ def parse(xmlfile):
         handler = FunctionHandler()
     except ParsingException as e:
         g_logger.warning(e.message)
-        return None # TODO critical?
+        return None  # TODO critical?
     parser.setContentHandler(handler)
     parser.parse(xmlfile)
     return handler.functions
