@@ -1142,6 +1142,19 @@ def contiApiHashing(inString, fName):
 
     return eax
 
+def fnv1(inString,fName):
+    val = 0x811c9dc5
+    for c in inString:
+        val = (0x1000193 * (ord(c) ^ val)) & 0xffffffff
+    return val
+
+pseudocode_fnv1 = '''
+    acc = 0x811c9dc5
+    for c in inString:
+        acc = (0x1000193 * (ord(c) ^ acc)) & 0xffffffff
+    return acc
+'''
+
 ############################################################
 
 # The list of tuples of (supported hash name, hash size, pseudo_code)
@@ -1194,7 +1207,8 @@ HASH_TYPES = [
     ('fnv1Xor67f', 32, pseudocode_fnv1Xor67f),
     ('adler32_666', 32, 'Adler32 with starting value 666'),
     ('shift0x82F63B78',           32, 'like crc32c'),
-    ('contiApiHashing',       32, pseudocode_contiApiHashing)
+    ('contiApiHashing',       32, pseudocode_contiApiHashing),
+    ('fnv1', 32, pseudocode_fnv1)
 ]
 
 
