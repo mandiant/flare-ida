@@ -33,9 +33,9 @@ import sqlite3
 
 try:
     import pefile
-except ImportError, err:
-    print "Error while importing pefile module: %s" % str(err)
-    print "Please make sure it is installed: http://code.google.com/p/pefile/"
+except ImportError as err:
+    print("Error while importing pefile module: %s" % str(err))
+    print("Please make sure it is installed: http://code.google.com/p/pefile/")
     sys.exit(1)
 
 #This is a list of interesting dll's to use if not traversing a directory
@@ -214,13 +214,13 @@ def rol(inVal, numShifts, dataSize=32):
 
 def poisonIvyHash(inStr,fName):
     #need a null at the end of the string
-    if inStr[-1] != '\x00':
-        inStr = inStr + '\x00'
+    if inStr[-1] != b'\x00':
+        inStr = inStr + b'\x00'
     cx = 0xffff
     dx = 0xffff
     for b1 in inStr:
         bx = 0
-        ax = ord(b1) ^ (cx & 0xff)
+        ax = b1 ^ (cx & 0xff)
         cx =  ((cx>>8)&0xff) | ((dx&0xff)<<8)
         dx = ((dx>>8)&0xff) | 0x800
         while (dx & 0xff00) != 0:
@@ -246,7 +246,7 @@ def rol3XorEax(inString,fName):
     ecx = 0
     eax = 0
     for i in inString:
-        eax = eax | ord(i)
+        eax = eax | i
         ecx = ecx ^ eax
         ecx = rol(ecx, 0x3, 32)
         ecx += 1
@@ -271,7 +271,7 @@ def rol7AddHash32(inString,fName):
     val = 0
     for i in inString:
         val = rol(val, 0x7, 32)
-        val += ord(i)
+        val += i
     return val
 
 pseudocode_rol7AddHash32 = '''acc := 0;
@@ -287,7 +287,7 @@ def rol5AddHash32(inString,fName):
     val = 0
     for i in inString:
         val = rol(val, 0x5, 32)
-        val += ord(i)
+        val += i
     return val
 
 pseudocode_rol5AddHash32 = '''acc := 0;
@@ -301,8 +301,8 @@ def addRor4WithNullHash32(inString,fName):
     if inString is None:
         return 0
     val = 0
-    for i in inString + "\x00":
-        val = (val & 0xffffff00) + ((val + ord(i)) & 0xff)
+    for i in inString + b"\x00":
+        val = (val & 0xffffff00) + ((val + i) & 0xff)
         val = ror(val, 0x4, 32)
     return val
 
@@ -320,7 +320,7 @@ def ror7AddHash32(inString,fName):
     val = 0
     for i in inString:
         val = ror(val, 0x7, 32)
-        val += ord(i)
+        val += i
     return val
 
 pseudocode_ror7AddHash32 = '''acc := 0;
@@ -336,7 +336,7 @@ def ror9AddHash32(inString,fName):
     val = 0
     for i in inString:
         val = ror(val, 0x9, 32)
-        val += ord(i)
+        val += i
     return val
 
 pseudocode_ror9AddHash32 = '''acc := 0;
@@ -352,7 +352,7 @@ def ror11AddHash32(inString,fName):
     val = 0
     for i in inString:
         val = ror(val, 0xb, 32)
-        val += ord(i)
+        val += i
     return val
 
 pseudocode_ror11AddHash32 = '''acc := 0;
@@ -368,7 +368,7 @@ def ror13AddHash32(inString,fName):
     val = 0
     for i in inString:
         val = ror(val, 0xd, 32)
-        val += ord(i)
+        val += i
     return val
 
 pseudocode_ror13AddHash32 = '''acc := 0;
@@ -382,9 +382,9 @@ def ror13AddWithNullHash32(inString,fName):
     if inString is None:
         return 0
     val = 0
-    for i in inString + "\x00":
+    for i in inString + b"\x00":
         val = ror(val, 0xd, 32)
-        val += ord(i)
+        val += i
     return val
 
 pseudocode_ror13AddWithNullHash32 = '''acc := 0;
@@ -412,7 +412,7 @@ def shl7Shr19XorHash32(inString,fName):
         edx = 0xffffffff & (val << 7)
         ecx = 0xffffffff & (val >> 0x19)
         eax = edx | ecx
-        t = 0xff & (ord(i) ^ 0xf4)
+        t = 0xff & (i ^ 0xf4)
         val = eax ^ t
     return val
 
@@ -430,7 +430,7 @@ def sll1AddHash32(inString,fName):
         return 0
     val = 0
     for i in inString:
-        b = ord(i)
+        b = i
         b = 0xff & (b | 0x60)
         val = val + b
         val = val << 1
@@ -464,7 +464,7 @@ def ror13AddHash32AddDll(inString,fName):
     val = 0
     for i in inString:
         val = ror(val, 0xd, 32)
-        val += ord(i)
+        val += i
     val = ror(val, 0xd, 32)
     val += dllHash
     if val >= 4294967296:
@@ -483,7 +483,7 @@ def mult21AddHash32(inString,fName):
     acc = 0
     for i in inString:
         acc = 0xffffffff & (acc * 0x21)
-        acc = 0xffffffff & (acc + ord(i))
+        acc = 0xffffffff & (acc + i)
     return acc
 
 
@@ -499,7 +499,7 @@ def add1505Shl5Hash32(inString,fName):
   for ch in inString:
     val += (val << 5)
     val &= 0xFFFFFFFF
-    val += ord(ch)
+    val += ch
     val &= 0xFFFFFFFF
   return val
 
@@ -516,7 +516,7 @@ def rol7XorHash32(inString,fName):
     val = 0
     for i in inString:
         val = rol(val, 0x7, 32)
-        val = val ^ (0xff & ord(i))
+        val = val ^ (0xff & i)
     return val
 
 pseudocode_rol7XorHash32 = '''acc := 0;
@@ -532,7 +532,7 @@ def rol7AddXor2Hash32(inString,fName):
     val = 0
     for i in inString:
         val = rol(val, 0x7, 32)
-        val += (ord(i) ^ 2)
+        val += (i ^ 2)
     return val
 
 pseudocode_rol7AddXor2Hash32 = '''acc := 0;
@@ -548,9 +548,9 @@ def dualaccModFFF1Hash(inString,fName):
 
     v4, v8 = 0, 1
     for ltr in inString:
-        v8 = (ord(ltr) + v8) % 0x0FFF1
+        v8 = (ltr + v8) % 0x0FFF1
         v4 = (v4 + v8) % 0x0FFF1
-    return (v4 << 0x10)|v8
+    return (v4 << 0x10) | v8
 
 pseudocode_dualaccModFFF1Hash = '''
 acc_1 := 0
@@ -563,9 +563,8 @@ return (acc_1 << 0x10) | acc2
 '''
 
 def hash_Carbanak(inString,fName):
-    a2 = map(ord, inString)
     ctr = 0
-    for i in a2:
+    for i in inString:
         ctr = (ctr << 4) + i
         if (ctr & 0xF0000000):
             ctr = (((ctr & 0xF0000000) >> 24) ^ ctr) & 0x0FFFFFFF
@@ -595,7 +594,7 @@ def hash_ror13AddUpperDllnameHash32(inString,fName):
         dllHash = 0xffffffff & dllHash
     for i in inString:
         val = ror(val, 0xd, 32)
-        val += ord(i)
+        val += i
         val = 0xffffffff & val
     return 0xffffffff & (dllHash + val)
 
@@ -619,7 +618,7 @@ return  acc + dllhash
 def fnv1Xor67f(inString,fName):
     val = 0x811c9dc5
     for c in inString:
-        val = (0x1000193 * (ord(c) ^ val)) & 0xffffffff
+        val = (0x1000193 * (c ^ val)) & 0xffffffff
     return val ^ 0x67f
 
 pseudocode_fnv1Xor67f = '''
@@ -645,7 +644,7 @@ def ror13AddHash32DllSimple(inString,fName):
     val = 0
     for i in inString:
         val = ror(val, 0xd, 32)
-        val += ord(i)
+        val += i
     val += dll_hash
     return val & 0xFFFFFFFF
 
@@ -663,7 +662,7 @@ def imul83hAdd(inString,fName):
     val = 0
     for i in inString:
         val = val * 131
-        val += ord(i)
+        val += i
     val = val & 0xFFFFFFFF
     return val
 
@@ -680,10 +679,10 @@ def ror13AddHash32Sub20h(inString,fName):
     val = 0
     for i in inString:
         val = ror(val, 0xd, 32)
-        if ord(i) < 97:
-            val = int(val) + ord(i)
+        if i < 97:
+            val = int(val) + i
         else:
-            val = int(val) + ord(i) - 32
+            val = int(val) + i - 32
     return val
 
 pseudocode_ror13AddHash32Sub20h = '''acc := 0;
@@ -701,7 +700,7 @@ def rol3XorHash32(inString,fName):
     val = 0
     for i in inString:
         val = rol(val, 0x3, 32)
-        val = val ^ ord(i)
+        val = val ^ i
     return val
 
 pseudocode_rol3XorHash32 = '''acc := 0;
@@ -716,7 +715,7 @@ def chAddRol8Hash32(inString,fName):
         return 0
     val = 0
     for i in inString:
-        val = val ^ (ord(i) * 256)
+        val = val ^ (i * 256)
         val = rol(val, 0x8, 32)
         val_hex = "%08x"%val
         valh_str = val_hex[4:6]
@@ -737,7 +736,7 @@ def xorShr8Hash32(inString,fName):
         return 0
     val = 0xFFFFFFFF
     for i in inString:
-        ci = ord(i)
+        ci = i
         ci = ci ^ val
         ci = ci * val
         ci_hex = "%16x"%ci
@@ -758,7 +757,7 @@ def addRor13Hash32(inString,fName):
         return 0
     val = 0
     for i in inString:
-        val += ord(i)
+        val += i
         val = ror(val, 0xd, 32)
     return val
 
@@ -774,7 +773,7 @@ def addRor13HashOncemore32(inString,fName):
         return 0
     val = 0
     for i in inString:
-        val += ord(i)
+        val += i
         val = ror(val, 0xd, 32)
     val = ror(val, 0xd, 32)
     return val
@@ -792,7 +791,7 @@ def addRol5HashOncemore32(inString,fName):
         return 0
     val = 0
     for i in inString:
-        val += ord(i)
+        val += i
         val = rol(val, 0x5, 32)
     val = rol(val, 0x5, 32)
     return val
@@ -812,7 +811,7 @@ def or21hXorRor11Hash32(inString,fName):
     val = 0
     ors = 0
     for i in inString:
-        ors = ord(i) | 33
+        ors = i | 33
         val = val ^ ors
         val = rol(val, 0xb, 32)
     return val
@@ -831,7 +830,7 @@ def or23hXorRor17Hash32(inString,fName):
     val = 0
     ors = 0
     for i in inString:
-        ors = ord(i) | 35
+        ors = i | 35
         val = val ^ ors
         val = rol(val, 0x11, 32)
     return val
@@ -850,7 +849,7 @@ def rol9AddHash32(inString,fName):
     val = 0
     for i in inString:
         val = rol(val, 0x9, 32)
-        val += ord(i)
+        val += i
     return val
 
 pseudocode_rol9AddHash32 = '''acc := 0;
@@ -866,7 +865,7 @@ def rol9XorHash32(inString,fName):
     val = 0
     for i in inString:
         val = rol(val, 0x9, 32)
-        val = val ^ ord(i)
+        val = val ^ i
     return val
 
 pseudocode_rol9XorHash32 = '''acc := 0;
@@ -881,7 +880,7 @@ def xorRol9Hash32(inString,fName):
         return 0
     val = 0
     for i in inString:
-        val = val ^ ord(i)
+        val = val ^ i
         val = rol(val, 0x9, 32)
     return val
 
@@ -898,7 +897,7 @@ def shl7Shr19AddHash32(inString,fName):
         edx = 0xffffffff & (val << 7)
         ecx = 0xffffffff & (val >> 0x19)
         eax = edx | ecx
-        t = 0xff & ord(i)
+        t = 0xff & i
         val = eax + t
     return val
 
@@ -914,7 +913,7 @@ for c in input_string {
 def playWith0xe8677835Hash(inString,fName):
     val = 0xFFFFFFFF
     for i in inString:
-        val ^= ord(i)
+        val ^= i
         for j in range(0, 8):
             if (val&0x1) == 1:
                 val ^= 0xe8677835
@@ -931,7 +930,7 @@ def rol5XorHash32(inString,fName):
     val = 0
     for i in inString:
         val = rol(val, 0x5, 32)
-        ors = ord(i) | 32
+        ors = i | 32
         val = val ^ ors
     return val
 
@@ -948,7 +947,7 @@ def shl7SubHash32DoublePulser(inString,fName):
     for i in inString:
         edi = 0xffffffff & (eax << 7)
         eax = 0xffffffff & (edi - eax)
-        eax = eax + (0xff & ord(i))
+        eax = eax + (0xff & i)
     edi = 0xffffffff & (eax << 7)
     eax = 0xffffffff & (edi - eax)
     return eax
@@ -967,7 +966,7 @@ def imul21hAddHash32(inString,fName):
     val = 0x1505
     for i in inString:
         val = (val * 0x21) & 0xFFFFFFFF
-        val = (val + (ord(i) & 0xFFFFFFDF)) & 0xFFFFFFFF
+        val = (val + (i & 0xFFFFFFDF)) & 0xFFFFFFFF
     return val
 
 pseudocode_imul21hAddHash32 = '''acc := 0x1505;
@@ -980,9 +979,9 @@ acc := SHL(acc, 7) - acc
 
 def crc32bzip2lower(inString,fName):
     crc32_table = [0] * 256
-    for i in xrange(256):
+    for i in range(256):
         v = i << 24
-        for j in xrange(8):
+        for j in range(8):
             if (v & 0x80000000) == 0:
                 v = (2 * v) & 0xffffffff
             else:
@@ -991,16 +990,16 @@ def crc32bzip2lower(inString,fName):
 
     result = 0xffffffff
     for c in inString:
-        result = (crc32_table[ ord(c.lower()) ^ ((result >> 24) & 0xff) ] ^ (result << 8)) & 0xffffffff
+        result = (crc32_table[ ord(chr(c).lower()) ^ ((result >> 24) & 0xff) ] ^ (result << 8)) & 0xffffffff
 
     return (result ^ 0xffffffff) & 0xffffffff
 
 def shr2Shl5XorHash32(inString,fName):
     result = 0x4e67c6a7
-    if inString.startswith("Nt") or inString.startswith("Zw"):
+    if inString.startswith(b"Nt") or inString.startswith(b"Zw"):
         inString = inString[2:]
     for i in inString:
-        result ^= (ord(i) + (result >> 2) + (result << 5)) & 0xffffffff
+        result ^= (i + (result >> 2) + (result << 5)) & 0xffffffff
     return result
 
 pseudocode_shr2Shl5XorHash32 = '''acc := 0x4e67c6a7;
@@ -1019,9 +1018,9 @@ def rol8Xor0xB0D4D06Hash32(inString,fName):
         return 0
     val = 0
     for i in inString:
-        val = val ^ (ord(i) & 0xDF)
+        val = val ^ (i & 0xDF)
         val = rol(val, 0x8, 32)
-        val = val + (ord(i) & 0xDF)
+        val = val + (i & 0xDF)
     return (val ^ 0xB0D4D06) & 0xffffffff
 
 pseudocode_rol8Xor0xB0D4D06Hash32 = '''acc := 0;
@@ -1042,7 +1041,7 @@ def adler32_666(inString,fName):
 def shift0x82F63B78(inString,fName):
     val = 0
     for i in inString:
-        v1 = ((((ord(i) | 0x20) ^ val) >> 1) ^ (0x82F63B78 * (((ord(i) | 0x20) ^ val) & 1))) & 0xffffffff
+        v1 = ((((i | 0x20) ^ val) >> 1) ^ (0x82F63B78 * (((i | 0x20) ^ val) & 1))) & 0xffffffff
         v2 = ((((v1 >> 1) ^ (0x82F63B78 * (v1 & 1))) >> 1) ^ (0x82F63B78 * (((v1 >> 1) ^ (0x78 * (v1 & 1))) & 1))) & 0xffffffff
         v3 = ((((v2 >> 1) ^ (0x82F63B78 * (v2 & 1))) >> 1) ^ (0x82F63B78 * (((v2 >> 1) ^ (0x78 * (v2 & 1))) & 1))) & 0xffffffff
         v4 = ((((v3 >> 1) ^ (0x82F63B78 * (v3 & 1))) >> 1) ^ (0x82F63B78 * (((v3 >> 1) ^ (0x78 * (v3 & 1))) & 1))) & 0xffffffff
@@ -1074,7 +1073,7 @@ def contiApiHashing(inString, fName):
     hash_val = 0
 
     for i in range(0, len(API_buffer)):
-        API_buffer[i] = ord(API_buffer[i].lower())
+        API_buffer[i] = ord(chr(API_buffer[i]).lower())
 
     v15 = 0xFF889912
     string_length_2 = len(inString)
@@ -1145,7 +1144,7 @@ def contiApiHashing(inString, fName):
 def fnv1(inString,fName):
     val = 0x811c9dc5
     for c in inString:
-        val = (0x1000193 * (ord(c) ^ val)) & 0xffffffff
+        val = (0x1000193 * (c ^ val)) & 0xffffffff
     return val
 
 pseudocode_fnv1 = '''
@@ -1250,8 +1249,8 @@ class ShellcodeDbCreator(object):
                 meth = globals()[hashName]
                 hashType = self.getHashTypeByName(hashName)
                 self.hashes[hashName] = (hashType, meth)
-            except AttributeError, err:
-                print "Could not find method %s" % hashName
+            except AttributeError as err:
+                print("Could not find method %s" % hashName)
             
     def processDir(self, dirName):
         for fName in os.listdir(dirName):
@@ -1263,10 +1262,10 @@ class ShellcodeDbCreator(object):
                 peFile = pefile.PE(filePath)
                 if ((not hasattr(peFile, "DIRECTORY_ENTRY_EXPORT")) or (peFile.DIRECTORY_ENTRY_EXPORT is None)):
                     if VERBOSE:
-                        print "No exports: %s" % filePath
+                        print("No exports: %s" % filePath)
                 else:
                     #add the library to the lib table
-                    print "Processing file %s" % filePath
+                    print("Processing file %s" % filePath)
                     time1 = time.time()
                     libKey = self.addSourceLib(fName)
                     symCount = 0
@@ -1284,14 +1283,14 @@ class ShellcodeDbCreator(object):
                     self.conn.commit()
                     time2 = time.time()
                     timeDiff = time2 - time1
-                    print "Processed %d export symbols in %.02f seconds: %s" % (symCount, timeDiff, filePath)
+                    print("Processed %d export symbols in %.02f seconds: %s" % (symCount, timeDiff, filePath))
 
-            except pefile.PEFormatError, err:
+            except pefile.PEFormatError as err:
                 if VERBOSE:
-                    print "Skipping non-PE file %s: %s" % (filePath, str(err))
-            except Exception, err:
+                    print("Skipping non-PE file %s: %s" % (filePath, str(err)))
+            except Exception as err:
                 if VERBOSE:
-                    print "Skipping %s: %s" % (filePath, str(err))
+                    print("Skipping %s: %s" % (filePath, str(err)))
                 raise
 
     def addHashType(self, hashName, hashSize, code):
@@ -1318,7 +1317,7 @@ class ShellcodeDbCreator(object):
         if len(retList) == 0:
             return None
         elif len(retList) > 1:
-            print "ERROR: database in odd state. Multiple entries for hash name: %s" % hashName
+            print("ERROR: database in odd state. Multiple entries for hash name: %s" % hashName)
         #always return first entry, even on error
         return retList[0][0]
 
@@ -1332,7 +1331,7 @@ class ShellcodeDbCreator(object):
         if len(retList) == 0:
             return None
         elif len(retList) > 1:
-            print "ERROR: database in odd state. Multiple entries for source lib: %s" % libName
+            print("ERROR: database in odd state. Multiple entries for source lib: %s" % libName)
         #always return first entry, even on error
         return retList[0][0]
 
@@ -1392,12 +1391,12 @@ class ShellcodeDbCreator(object):
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
-        print "python %s <db_path> <dll_dir>" % sys.argv[0]
+        print("python %s <db_path> <dll_dir>" % sys.argv[0])
         sys.exit(1)
     dbPath = sys.argv[1]
     walkPath = sys.argv[2]
     hasher = ShellcodeDbCreator(dbPath, walkPath)
     hasher.run()
     hasher.close()
-    print "Done with symbol name hashing"
+    print("Done with symbol name hashing")
     
