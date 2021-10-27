@@ -77,15 +77,15 @@ class ApplyCalleeTypeRunner(object):
     def getUserDeclType(self, decl):
         tinfo = idaapi.tinfo_t()
         #logger.debug('Trying to parse declaration: %r', decl)
-        ret = idaapi.parse_decl2(idaapi.cvar.idati, decl, tinfo, idaapi.PT_TYP)
+        ret = idaapi.parse_decl(tinfo, idaapi.cvar.idati, decl, idaapi.PT_TYP)
         #logger.debug('Return from parse_decl2: %r', ret)
         if ret is None:
-            logger.info('parse_decl2 failed')
+            logger.info('parse_decl failed')
             return None
         return tinfo
 
     def getLocalType(self):
-        ret = idaapi.choose_local_tinfo(idaapi.cvar.idati, 'Choose local type to apply', None, None)
+        ret = idaapi.choose_local_tinfo(idaapi.cvar.idati, 'Choose local type to apply', None, 0, None)
         if not ret:
             logger.debug('User canceled. Bailing out')
             return
