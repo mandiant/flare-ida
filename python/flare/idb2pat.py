@@ -293,8 +293,7 @@ def make_func_sig(config, func):
         sig += public_format % (public - func.start_ea, name)
 
     for ref_loc, ref in refs.iteritems():
-        # TODO: what is the first arg?
-        name = get_true_name(0, ref)
+        name = get_name(ref)
         if name is None or name == "":
             continue
 
