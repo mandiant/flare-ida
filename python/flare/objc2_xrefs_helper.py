@@ -21,27 +21,13 @@
 
 import struct
 
-from ida_bytes import get_bytes
-
-from idaapi import add_dref
-from idaapi import get_inf_structure
-
-from idautils import Segments
-from idautils import XrefsTo
-
-from ida_bytes import patch_dword
+from ida_bytes import get_bytes, patch_dword
 from ida_kernwin import msg
-
-from idc import BADADDR
-from idc import dr_I
-from idc import get_func_name
-from idc import get_segm_end
-from idc import get_segm_name
-from idc import get_strlit_contents
-from idc import get_wide_dword,get_qword
-from idc import print_insn_mnem
-from idc import XREF_USER
-
+from idaapi import add_dref, get_inf_structure
+from idautils import Segments, XrefsTo
+from idc import (BADADDR, XREF_USER, dr_I, get_func_name, get_qword,
+                 get_segm_end, get_segm_name, get_strlit_contents,
+                 get_wide_dword, print_insn_mnem)
 
 DWORD_SIZE=4
 QWORD_SIZE=8
@@ -60,6 +46,7 @@ class AArch64LDRInstruction(object):
     """
     ENDIANNESS_BIG=0
     ENDIANNESS_LITTLE=1
+
     def __init__(self,instruction_bytes,endianness=1):
         """Decode the byte string for an arm64 LDR (literal) instruction
         
@@ -83,7 +70,6 @@ class AArch64LDRInstruction(object):
         self.instruction_bytes=instruction_bytes
         self.instruction_int=self.__unpack(instruction_bytes)
         self.__decode_ldr()
-        
 
     def __unpack(self,bytes):
         if self.endianness==self.ENDIANNESS_LITTLE:
@@ -113,10 +99,10 @@ class AArch64LDRInstruction(object):
             raise Exception("Not a valid LDR (literal) instruction)")
         self.op=op
         imm19_mask=self.__shiftL32(self.__shiftR32(0x00ffffff,5),5)
-        
+
         imm19=self.__shiftR32((self.instruction_int&imm19_mask),5)
         offset=imm19*4 #shift imm19<<2
-        
+
         self.offset=offset
 
         rt_mask=0b11111
@@ -248,7 +234,6 @@ class ObjCMethodAbstract(object):
             self.selector_ref=None
             return
 
-        
         self.sel_ref_va=self.selector_ref.frm
         if is_msg_ref:
             # adjust pointer to beginning of message ref struct to get xrefs
@@ -282,8 +267,6 @@ class ObjCMethodAbstract(object):
             #else, is this cross reference a pointer from a (const) method list?
             elif objc_const and xref.frm >= objc_const[0] and xref.frm < objc_const[1]:
                 const_ref_count += 1
-
-
 
         return (is_msg_ref,selector_ref,const_ref_count)
 
@@ -327,7 +310,7 @@ class ObjCMethodX86_64(ObjCMethodAbstract):
 
     def add_method_xref(self,xref):
         msg("Adding cross reference to method implementation for %s\n" % get_func_name(self.method_pointer))
-        
+
         #TODO: clean this up so it's more clear how we're parsing and patching the instruction
         #TODO: handle other potential instructions that could place a method selref into a register
         #TODO: sanity check what instruction we're actually working with before blindly deciding
@@ -431,7 +414,7 @@ class ObjcMethodList(list):
 
         #skip first two dwords in the method_list struct
         class_methods_start=class_methods_va+self.METHOD_LIST_OFFSET
-        
+
         class_methods_end=class_methods_start+(method_size*count)
 
         for va in range(class_methods_start,class_methods_end,method_size):
@@ -496,21 +479,19 @@ class ObjCMethodXRefs(list):
         segment_names=["__objc_data","__objc_selrefs","__objc_msgrefs","__objc_const"]
 
         segment_map=self.find_all_segments(segment_names)
-        
+
         # Segment map looks like:
         # {
         #     "__objc_data":(obc_data_start_va,objc_data_end_va),
         #     ...
         # }
-        
+
         for name in segment_names:
             if name not in segment_map:
                 raise ObjCException("Couldn't find segment %s" % name)
 
         #Walk __objc_data and build a list of classes
         self.walk_classes(segment_map)
-
-            
 
     def find_all_segments(self,segment_names):
         segments={name:None for name in segment_names}
@@ -548,7 +529,7 @@ def detect_arch():
     if not info.is_be():
         is_le=True
 
-    procname=info.procName
+    procname=info.procname
     if bits==64 and is_le:
         if procname=="ARM":
             msg("Detected architecture: arm64\n")
@@ -560,10 +541,6 @@ def detect_arch():
     return arch
 
 
-
-
-
-
 def main():
     arch=detect_arch()
     xref_list=ObjCMethodXRefs(arch=arch)
@@ -573,5 +550,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
-
