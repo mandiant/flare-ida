@@ -205,7 +205,6 @@ def rol(inVal, numShifts, dataSize=32):
     if (dataSize != 8) and (dataSize != 16) and (dataSize != 32) and (dataSize != 64):
         raise ValueError('Bad dataSize')
     bitMask = ROTATE_BITMASK[dataSize]
-    currVal = inVal
     return bitMask & ((inVal << numShifts) | (inVal >> (dataSize-numShifts)))
 
 ############################################################
@@ -398,7 +397,7 @@ def ror13AddHash32Sub1(inString,fName):
     '''Same as ror13AddHash32, but subtract 1 afterwards'''
     return ror13AddHash32(inString,fName) - 1
 
-pseudocode_ror13AddHash32 = '''acc := 0;
+pseudocode_ror13AddHash32Sub1 = '''acc := 0;
 for c in input_string {
    acc := ROR(acc, 13);
    acc := acc + c;
@@ -891,6 +890,22 @@ for c in input_string {
 }
 '''
 
+def rol10WithNullAddHash32(inString,fName):
+    if inString is None:
+        return 0
+    val = 0
+    for i in inString + b"\x00":
+        val = rol(val, 0xa, 32)
+        val += i
+    return val
+
+pseudocode_rol10WithNullAddHash32 = '''acc := 0;
+for c in input_string_with_trailing_NULL {
+   acc := ROL(acc, 0x10):
+   acc := acc + c;
+}
+'''
+
 def shl7Shr19AddHash32(inString,fName):
     val = 0
     for i in inString:
@@ -1183,6 +1198,7 @@ HASH_TYPES = [
     ('rol9AddHash32',       32, pseudocode_rol9AddHash32),
     ('rol9XorHash32',       32, pseudocode_rol9XorHash32),
     ('xorRol9Hash32',       32, pseudocode_xorRol9Hash32),
+    ('rol10WithNullAddHash32',      32, pseudocode_rol10WithNullAddHash32),
     ('shl7Shr19XorHash32',     32, pseudocode_shl7Shr19XorHash32),
     ('shl7Shr19AddHash32',     32, pseudocode_shl7Shr19AddHash32),
     ('shl7SubHash32DoublePulser',     32, pseudocode_shl7SubHash32DoublePulser),
@@ -1278,7 +1294,7 @@ class ShellcodeDbCreator(object):
                                 symHash = hashMeth(sym.name,fName)
                                 #print " Done hashing: %08x:%s" % (symHash, sym.name)
                                 if symHash is not None:
-                                    self.addSymbolHash(symHash, hashType, libKey, sym.name)
+                                    self.addSymbolHash(symHash, hashType, libKey, sym.name.decode())
                     #commit outstanding transaction
                     self.conn.commit()
                     time2 = time.time()
