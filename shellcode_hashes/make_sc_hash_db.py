@@ -901,7 +901,7 @@ def rol10WithNullAddHash32(inString,fName):
 
 pseudocode_rol10WithNullAddHash32 = '''acc := 0;
 for c in input_string_with_trailing_NULL {
-   acc := ROL(acc, 0x10):
+   acc := ROL(acc, 10):
    acc := acc + c;
 }
 '''
