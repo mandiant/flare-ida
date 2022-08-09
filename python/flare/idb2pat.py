@@ -6,7 +6,6 @@ from enum import auto, Enum
 import idc
 from idaapi import *
 
-# TODO: make this into an enum
 
 class ConfigMode(Enum):
     FUNCTION_MODE_MIN = auto()
