@@ -1,42 +1,21 @@
+import os
 import json
 import logging
-import binascii
-import itertools
-from collections import namedtuple
+from enum import auto, Enum
 
 import idc
 from idaapi import *
 
-# TODO: make this into an enum
-FUNCTION_MODE_MIN = 0
-NON_AUTO_FUNCTIONS = FUNCTION_MODE_MIN
-LIBRARY_FUNCTIONS = 1
-PUBLIC_FUNCTIONS = 2
-ENTRY_POINT_FUNCTIONS = 3
-ALL_FUNCTIONS = 4
-USER_SELECT_FUNCTION = 5
-FUNCTION_MODE_MAX = USER_SELECT_FUNCTION
 
-
-# via: http://stackoverflow.com/questions/9816603/range-is-too-large-python
-# In Python 2.x, `xrange` can only handle Python 2.x ints,
-# which are bound by the native long integer size of the platform.
-# `range` allocates a list with all numbers beforehand on Python 2.x,
-# and is therefore unsuitable for large arguments.
-def zrange(*args):
-    start = 0
-    end = 0
-    if len(args) == 1:
-        end = args[0]
-    elif len(args) == 2:
-        start = args[0]
-        end = args[1]
-    else:
-        raise RuntimeError("Invalid arguments provided to zrange: {:s}".format(str(args)))
-    if end < start:
-        raise RuntimeError("zrange only iterates from smaller to bigger numbers only: {:d}, {:d}".format(start, end))
-    return iter(itertools.count(start).next, end)
-
+class ConfigMode(Enum):
+    FUNCTION_MODE_MIN = auto()
+    NON_AUTO_FUNCTIONS = FUNCTION_MODE_MIN
+    LIBRARY_FUNCTIONS = auto()
+    PUBLIC_FUNCTIONS = auto()
+    ENTRY_POINT_FUNCTIONS = auto()
+    ALL_FUNCTIONS = auto()
+    USER_SELECT_FUNCTION = auto()
+    FUNCTION_MODE_MAX = USER_SELECT_FUNCTION
 
 def get_ida_logging_handler():
     """
@@ -51,7 +30,7 @@ g_logger = logging.getLogger("idb2pat")
 
 
 class Config(object):
-    def __init__(self, min_func_length=6, pointer_size=4, mode=ALL_FUNCTIONS, pat_append=False, logfile="", loglevel="DEBUG", logenabled=False):
+    def __init__(self, min_func_length=6, pointer_size=4, mode=ConfigMode.ALL_FUNCTIONS, pat_append=False, logfile="", loglevel="DEBUG", logenabled=False):
         super(Config, self).__init__()
         self.min_func_length = min_func_length
         # TODO: get pointer_size from IDA
@@ -123,7 +102,7 @@ def crc16(data, crc):
 
 
 def get_functions():
-   for i in zrange(get_func_qty()):
+   for i in range(get_func_qty()):
         yield getn_func(i)
 
 
@@ -160,7 +139,7 @@ def find_ref_loc(config, ea, ref):
         ref = (ref - get_item_end(ea)) & ((1<<config.pointer_size*8)-1)
 
     if is_code(get_full_flags(ea)):
-        for i in zrange(ea, max(ea, 1 + get_item_end(ea) - config.pointer_size)):
+        for i in range(ea, max(ea, 1 + get_item_end(ea) - config.pointer_size)):
             if get_dword(i) == ref:
                 return i
 
@@ -213,7 +192,7 @@ def make_func_sig(config, func):
             ref_loc = find_ref_loc(config, ea, ref)
             if ref_loc != BADADDR:
                 logger.debug("  ref loc: %s", hex(ref_loc))
-                for i in zrange(config.pointer_size):
+                for i in range(config.pointer_size):
                     logger.debug("    variable %s", hex(ref_loc + i))
                     variable_bytes.add(ref_loc + i)
                 refs[ref_loc] = ref
@@ -226,7 +205,7 @@ def make_func_sig(config, func):
                 ref_loc = find_ref_loc(config, ea, ref)
                 if ref_loc != BADADDR:
                     logger.debug("  ref loc: %s", hex(ref_loc))
-                    for i in zrange(config.pointer_size):
+                    for i in range(config.pointer_size):
                         logger.debug("    variable %s", hex(ref_loc + i))
                         variable_bytes.add(ref_loc + i)
                     refs[ref_loc] = ref
@@ -240,7 +219,7 @@ def make_func_sig(config, func):
                     ref_loc = find_ref_loc(config, ea, ref)
                     if BADADDR != ref_loc:
                         logger.debug("  ref loc: %s", hex(ref_loc))
-                        for i in zrange(config.pointer_size):
+                        for i in range(config.pointer_size):
                             logger.debug("    variable %s", hex(ref_loc + i))
                             variable_bytes.add(ref_loc + i)
                         refs[ref_loc] = ref
@@ -249,19 +228,19 @@ def make_func_sig(config, func):
 
     sig = ""
     # first 32 bytes, or til end of function
-    for ea in zrange(func.start_ea, min(func.start_ea + 32, func.end_ea)):
+    for ea in range(func.start_ea, min(func.start_ea + 32, func.end_ea)):
         if ea in variable_bytes:
             sig += ".."
         else:
             sig += "%02X" % (get_byte(ea))
 
-    sig += ".." * (32 - (len(sig) / 2))
+    sig += ".." * int(32 - (len(sig) / 2))
 
     if func.end_ea - func.start_ea > 32:
-        crc_data = [0 for i in zrange(256)]
+        crc_data = [0 for i in range(256)]
 
         # for 255 bytes starting at index 32, or til end of function, or variable byte
-        for loc in zrange(32, min(func.end_ea - func.start_ea, 32 + 255)):
+        for loc in range(32, min(func.end_ea - func.start_ea, 32 + 255)):
             if func.start_ea + loc in variable_bytes:
                 break
 
@@ -292,7 +271,7 @@ def make_func_sig(config, func):
 
         sig += public_format % (public - func.start_ea, name)
 
-    for ref_loc, ref in refs.iteritems():
+    for ref_loc, ref in refs.items():
         name = get_name(ref)
         if name is None or name == "":
             continue
@@ -310,7 +289,7 @@ def make_func_sig(config, func):
     # Tail of the module starts at the end of the CRC16 block.
     if loc < func.end_ea - func.start_ea:
         tail = " "
-        for ea in zrange(func.start_ea + loc, min(func.end_ea, func.start_ea + 0x8000)):
+        for ea in range(func.start_ea + loc, min(func.end_ea, func.start_ea + 0x8000)):
             if ea in variable_bytes:
                 tail += ".."
             else:
@@ -324,7 +303,7 @@ def make_func_sig(config, func):
 def make_func_sigs(config):
     logger = logging.getLogger("idb2pat:make_func_sigs")
     sigs = []
-    if config.mode == USER_SELECT_FUNCTION:
+    if config.mode == ConfigMode.USER_SELECT_FUNCTION:
         f = choose_func("Choose Function:", BADADDR)
         if f is None:
             logger.error("No function selected")
@@ -342,7 +321,7 @@ def make_func_sigs(config):
             logger.error("Failed to create signature for function at %s (%s)",
                 hex(f.start_ea), get_name(f.start_ea) or "")
 
-    elif config.mode == NON_AUTO_FUNCTIONS:
+    elif config.mode == ConfigMode.NON_AUTO_FUNCTIONS:
         for f in get_functions():
             if has_name(get_full_flags(f.start_ea)) and f.flags & FUNC_LIB == 0:
                 try:
@@ -354,7 +333,7 @@ def make_func_sigs(config):
                     logger.error("Failed to create signature for function at %s (%s)",
                         hex(f.start_ea), get_name(f.start_ea) or "")
 
-    elif config.mode == LIBRARY_FUNCTIONS:
+    elif config.mode == ConfigMode.LIBRARY_FUNCTIONS:
         for f in get_functions():
             if has_name(get_full_flags(f.start_ea)) and f.flags & FUNC_LIB != 0:
                 try:
@@ -366,7 +345,7 @@ def make_func_sigs(config):
                     logger.error("Failed to create signature for function at %s (%s)",
                         hex(f.start_ea), get_name(f.start_ea) or "")
 
-    elif config.mode == PUBLIC_FUNCTIONS:
+    elif config.mode == ConfigMode.PUBLIC_FUNCTIONS:
         for f in get_functions():
             if is_public_name(f.start_ea):
                 try:
@@ -378,8 +357,8 @@ def make_func_sigs(config):
                     logger.error("Failed to create signature for function at %s (%s)",
                         hex(f.start_ea), get_name(f.start_ea) or "")
 
-    elif config.mode == ENTRY_POINT_FUNCTIONS:
-        for i in zrange(get_func_qty()):
+    elif config.mode == ConfigMode.ENTRY_POINT_FUNCTIONS:
+        for i in range(get_func_qty()):
             f = get_func(get_entry(get_entry_ordinal(i)))
             if f is not None:
                 try:
@@ -391,7 +370,7 @@ def make_func_sigs(config):
                     logger.error("Failed to create signature for function at %s (%s)",
                         hex(f.start_ea), get_name(f.start_ea) or "")
 
-    elif config.mode == ALL_FUNCTIONS:
+    elif config.mode == ConfigMode.ALL_FUNCTIONS:
         n = get_func_qty()
         for i, f in enumerate(get_functions()):
             try:
@@ -458,20 +437,13 @@ def main():
 
     sigs = make_func_sigs(c)
 
-    if c.pat_append:
-        with open(filename, "ab") as f:
-            for sig in sigs:
-                f.write(sig)
-                f.write("\r\n")
-            f.write("---")
-            f.write("\r\n")
-    else:
-        with open(filename, "wb") as f:
-            for sig in sigs:
-                f.write(sig)
-                f.write("\r\n")
-            f.write("---")
-            f.write("\r\n")
+    f_flags = "ab" if c.pat_append else "wb"
+    with open(filename, f_flags) as f:
+        for sig in sigs:
+            f.write(sig.encode('ascii'))
+            f.write(b"\r\n")
+        f.write(b"---")
+        f.write(b"\r\n")
 
 if __name__ == "__main__":
     main()
