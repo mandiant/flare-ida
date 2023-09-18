@@ -119,33 +119,6 @@ def get_func_at_ea(ea):
             _g_function_cache[f.start_ea] = f
 
     return _g_function_cache.get(f.start_ea, None)
-
-
-def find_ref_loc(config, ea, ref):
-    """
-    type config: Config
-    type ea: idc.ea_t
-    type ref: idc.ea_t
-    """
-    logger = logging.getLogger("idb2pat:find_ref_loc")
-    if ea == BADADDR:
-        logger.debug("Bad parameter: ea")
-        return BADADDR
-    if ref == BADADDR:
-        logger.debug("Bad parameter: ref")
-        return BADADDR
-
-    if idc.get_operand_type(ea, 0) == o_near:
-        ref = (ref - get_item_end(ea)) & ((1<<config.pointer_size*8)-1)
-
-    if is_code(get_full_flags(ea)):
-        for i in range(ea, max(ea, 1 + get_item_end(ea) - config.pointer_size)):
-            if get_dword(i) == ref:
-                return i
-
-    return BADADDR
-
-
 def to_bytestring(seq):
     """
     convert sequence of chr()-able items to a str of
@@ -180,49 +153,35 @@ def make_func_sig(config, func):
     while ea != BADADDR and ea < func.end_ea:
         logger.debug("ea: %s", hex(ea))
 
+        instruction = ida_ua.insn_t()
+        ida_ua.decode_insn(instruction, ea)
+
         name = get_name(ea)
         if name is not None and name != "":
             logger.debug("has a name")
             publics.append(ea)
 
-        ref = get_first_dref_from(ea)
-        if ref != BADADDR:
-            # data ref
-            logger.debug("has data ref")
-            ref_loc = find_ref_loc(config, ea, ref)
-            if ref_loc != BADADDR:
-                logger.debug("  ref loc: %s", hex(ref_loc))
-                for i in range(config.pointer_size):
-                    logger.debug("    variable %s", hex(ref_loc + i))
-                    variable_bytes.add(ref_loc + i)
-                refs[ref_loc] = ref
+        for operand in instruction.ops:
+            if operand.type == idc.o_void:
+                break
 
-            # not sure why we only care about two...
-            # only two possible operands?
-            ref = get_next_dref_from(ea, ref)
-            if ref != BADADDR:
-                logger.debug("has data ref2")
-                ref_loc = find_ref_loc(config, ea, ref)
-                if ref_loc != BADADDR:
-                    logger.debug("  ref loc: %s", hex(ref_loc))
-                    for i in range(config.pointer_size):
-                        logger.debug("    variable %s", hex(ref_loc + i))
-                        variable_bytes.add(ref_loc + i)
-                    refs[ref_loc] = ref
-        else:
-            # code ref
-            ref = get_first_fcref_from(ea)
-            if ref != BADADDR:
-                logger.debug("has code ref")
-                if ref < func.start_ea or ref >= func.end_ea:
-                    # code ref is outside function
-                    ref_loc = find_ref_loc(config, ea, ref)
-                    if BADADDR != ref_loc:
-                        logger.debug("  ref loc: %s", hex(ref_loc))
-                        for i in range(config.pointer_size):
-                            logger.debug("    variable %s", hex(ref_loc + i))
-                            variable_bytes.add(ref_loc + i)
-                        refs[ref_loc] = ref
+            elif (
+                    # If the operand is data reference, and it references the CS segment register,
+                    # consider the operand to be variant bytes.
+                    # The referenced segment register is encoded in the high bytes of op_t.specval.
+                    (operand.type == idc.o_mem and operand.specval >> 16 == ida_segregs.R_cs)
+
+                    # If the operand is a code reference outside of the function,
+                    # consider the operand to be variant bytes.
+                    or (operand.type in (idc.o_far, idc.o_near) and operand.addr not in range(func.start_ea, func.end_ea))
+            ):
+                address_operand_start = ea + operand.offb
+                address_operand_end = address_operand_start + idc.get_item_size(address_operand_start)
+
+                for i in range(address_operand_start, address_operand_end):
+                    variable_bytes.add(i)
+
+                refs[address_operand_start] = operand.addr
 
         ea = next_not_tail(ea)
 
