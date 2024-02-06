@@ -92,6 +92,12 @@ StackString = namedtuple("StackString",
 def main():
     eh = flare_emu.EmuHelper()
 
+    # hacky way to increase stack size (default is 0x2000 and it's really only half, because the stack pointer begins
+    # in the middle of the allocated stack size); for functions with larger stacks this caused issues, see e.g.,
+    # https://github.com/mandiant/flare-ida/issues/127
+    eh.stackSize = 0x8000
+    eh.resetEmulatorHeapAndStack()
+    
     # dictionary that stores data used across emulation runs, function emulation specific data is set below
     userData = {
         # found stackstrings in stack memory
