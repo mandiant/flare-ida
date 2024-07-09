@@ -218,8 +218,7 @@ def make_func_sig(config, func):
 
     sig += " %02X" % (alen)
     sig += " %04X" % (crc)
-    # TODO: does this need to change for 64bit?
-    sig += " %04X" % (func.end_ea - func.start_ea)
+    sig += " %08X" % (func.end_ea - func.start_ea)
 
     # this will be either " :%04d %s" or " :%08d %s"
     public_format = " :%%0%dX %%s" % (config.pointer_size)
