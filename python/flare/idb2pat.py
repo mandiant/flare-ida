@@ -234,13 +234,16 @@ def make_func_sig(config, func):
         if name is None or name == "":
             continue
 
+        addr = 0
+        ref_format = ""
+        
         if ref_loc >= func.start_ea:
             # this will be either " ^%04d %s" or " ^%08d %s"
             addr = ref_loc - func.start_ea
             ref_format = " ^%%0%dX %%s" % (config.pointer_size)
         else:
             # this will be either " ^-%04d %s" or " ^-%08d %s"
-            addrs = func.start_ea - ref_loc
+            addr = func.start_ea - ref_loc
             ref_format = " ^-%%0%dX %%s" % (config.pointer_size)
         sig += ref_format % (addr, name)
         
