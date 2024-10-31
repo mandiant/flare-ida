@@ -23,17 +23,19 @@
 ############################################
 
 from __future__ import print_function
-import idc
+
+import logging
+import re
+import struct
+
+import flare_emu
 import idaapi
 import idautils
+import idc
 import unicorn
-import unicorn.x86_const
-import unicorn.arm_const
 import unicorn.arm64_const
-import logging
-import struct
-import flare_emu
-import re
+import unicorn.arm_const
+import unicorn.x86_const
 
 UNKNOWN = "??"
 MAX_STR_DISPLAY_LEN = 20
@@ -73,7 +75,7 @@ class Objc2Analyzer():
             self.processObjc()
         else:
             logging.debug("this Mach-O does not implement any Objective-C classes")
-    
+
     # it appears idc.get_name_ea_simple does not work for selector reference names that end in "_"
     def selRefLocByName(self, name):
         if name[:6] == "selRef":
@@ -121,11 +123,11 @@ class Objc2Analyzer():
                         reg2 = eh.getRegVal(regs[1])
                     logging.debug("possible IVAR reference found @%s, reg1: %s reg2: %s" % (
                         eh.hexString(address), eh.hexString(reg1), eh.hexString(reg2)))
-                    if type(reg1) is long and idc.get_name(reg1, idc.ida_name.GN_VISIBLE)[:13] == "_OBJC_IVAR_$_":
+                    if type(reg1) is int and idc.get_name(reg1, idc.ida_name.GN_VISIBLE)[:13] == "_OBJC_IVAR_$_":
                         uc.reg_write(eh.regs[dstopnd], self.getIvarInfo(eh, reg1, userData))
                         eh.skipInstruction(userData)
                         return
-                    elif type(reg2) is long and idc.get_name(reg2, idc.ida_name.GN_VISIBLE)[:13] == "_OBJC_IVAR_$_":
+                    elif type(reg2) is int and idc.get_name(reg2, idc.ida_name.GN_VISIBLE)[:13] == "_OBJC_IVAR_$_":
                         uc.reg_write(eh.regs[dstopnd], self.getIvarInfo(eh, reg2, userData))
                         eh.skipInstruction(userData)
                         return
@@ -184,7 +186,7 @@ class Objc2Analyzer():
                         for i in range(1, 3):
                             if m.group(i) in eh.regs:
                                 regVal = eh.getRegVal(m.group(i))
-                                if type(regVal) is long and regVal & self.magicMaskMask32 == self.magicMask32:
+                                if type(regVal) is int and regVal & self.magicMaskMask32 == self.magicMask32:
                                     # if both regs contain magic val, choose the ivar val over the self val
                                     if mv is None or (len(userData["magicVals"][regVal & 0xFFFF]) == 2 and
                                                       ")self" not in userData["magicVals"][regVal & 0xFFFF][0]):
@@ -257,11 +259,11 @@ class Objc2Analyzer():
                     idc.ida_name.GN_VISIBLE)[:7] == "selRef_" or 
                     eh.getRegVal(idc.print_operand(address, 0)) & self.magicMaskMask32 == 
                     self.magicMask32)):
-                    
+
                 # if the 2nd operand is an ivar magic val overwrite the 1st reg with it
                 if idc.get_operand_type(address, 1) == 1:
                     regVal = eh.getRegVal(idc.print_operand(address, 1))
-                    if (type(regVal) is long and regVal & self.magicMaskMask32 == self.magicMask32 and 
+                    if (type(regVal) is int and regVal & self.magicMaskMask32 == self.magicMask32 and 
                             (len(userData["magicVals"][regVal & 0xFFFF]) == 2 and
                              type(userData["magicVals"][regVal & 0xFFFF][0]) is str and
                              ")self" not in userData["magicVals"][regVal & 0xFFFF][0] and
@@ -281,7 +283,7 @@ class Objc2Analyzer():
                         reg = idc.print_operand(address, i)
                         if reg in eh.regs:
                             regVal = eh.getRegVal(reg)
-                            if type(regVal) is long and regVal & self.magicMaskMask32 == self.magicMask32:
+                            if type(regVal) is int and regVal & self.magicMaskMask32 == self.magicMask32:
                                 # favor the ivar over the returned id or self id
                                 if mv is None or (len(userData["magicVals"][regVal & 0xFFFF]) == 2 and
                                                   type(userData["magicVals"][regVal & 0xFFFF][0]) is str and
@@ -342,7 +344,7 @@ class Objc2Analyzer():
                                 eh.hexString(mv), dstOpnd, selName, eh.hexString(address)))
                             eh.skipInstruction(userData)
                             return
-                            
+
                 # accessing Ivar offset in class object or classref/selref offset from ADRP page base
                 # LDR instruction to get IVAR offset from id pointer
                 # LDRSW           X8, =8  ; NSString *_myVar;
@@ -380,7 +382,7 @@ class Objc2Analyzer():
                                 return
                             elif m.group(i) in eh.regs:
                                 regVal = eh.getRegVal(m.group(i))
-                                if type(regVal) is long and regVal & self.magicMaskMask64 == self.magicMask64:
+                                if type(regVal) is int and regVal & self.magicMaskMask64 == self.magicMask64:
                                     if mv is None or (len(userData["magicVals"][regVal & 0xFFFF]) == 2 and
                                                       type(userData["magicVals"][regVal & 0xFFFF][0]) is str and
                                                       ")self" not in userData["magicVals"][regVal & 0xFFFF][0]):
@@ -395,11 +397,11 @@ class Objc2Analyzer():
                 elif idc.get_operand_type(address, 1) == 4:
                     if srcOpnd[1:-1] in eh.regs:
                      regVal = eh.getRegVal(srcOpnd[1:-1])
-                     if type(regVal) is long and regVal & self.magicMaskMask64 == self.magicMask64:
+                     if type(regVal) is int and regVal & self.magicMaskMask64 == self.magicMask64:
                         uc.reg_write(eh.regs[dstOpnd], regVal)
                         eh.skipInstruction(userData)
                         return
-            # Non Link Time Optimized Mach-O uses ADRP/ADD to retrieve sels/ivars            
+            # Non Link Time Optimized Mach-O uses ADRP/ADD to retrieve sels/ivars
             # ADRP            X1, #selRef_new@PAGE
             # ADD             X1, X1, #selRef_new@PAGEOFF
             elif idc.print_insn_mnem(address) == "ADRP":
@@ -430,9 +432,9 @@ class Objc2Analyzer():
                             # skip two instructions to skip succeeding ADD
                             uc.reg_write(eh.regs["pc"], userData["currAddr"] + 8)
                             return
-                        
+
                 return
-                    
+
             # skip the ADD instructions with two operands for our magic values
             elif (idc.print_insn_mnem(address)[:3] == "ADD" and
                     opCnt == 2 and
@@ -452,7 +454,7 @@ class Objc2Analyzer():
                         reg = idc.print_operand(address, i)
                         if reg in eh.regs:
                             regVal = eh.getRegVal(reg)
-                            if type(regVal) is long and regVal & self.magicMaskMask64 == self.magicMask64:
+                            if type(regVal) is int and regVal & self.magicMaskMask64 == self.magicMask64:
                                 # favor the ivar over the returned id or self id
                                 if mv is None or (len(userData["magicVals"][regVal & 0xFFFF]) == 2 and
                                                   type(userData["magicVals"][regVal & 0xFFFF][0]) is str and
@@ -949,7 +951,7 @@ class Objc2Analyzer():
         classes = {}
         if self.objcData is None:
             return classes
-            
+
         for va in range(self.objcData[0], self.objcData[1], objc2ClassSize):
             if "_OBJC_METACLASS_$_" in idc.get_name(va, idc.ida_name.GN_VISIBLE):
                 continue
