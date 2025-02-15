@@ -16,6 +16,7 @@ class ConfigMode(Enum):
     ALL_FUNCTIONS = auto()
     USER_SELECT_FUNCTION = auto()
     FUNCTION_MODE_MAX = USER_SELECT_FUNCTION
+    USER_CREATED_NAME = auto()
 
 def get_ida_logging_handler():
     """
@@ -52,7 +53,7 @@ class Config(object):
         self.min_func_length = vals.get("min_func_length", self.min_func_length)
         self.pointer_size = vals.get("pointer_size", self.pointer_size)
         # TODO: make this a string, not magic number
-        self.mode = vals.get("mode", self.mode)
+        self.mode = ConfigMode(vals.get("mode", self.mode.value))
         self.pat_append = vals.get("pat_append", self.pat_append)
         self.logfile = vals.get("logfile", self.logfile)
         self.logenabled = vals.get("logenabled", self.logenabled)
@@ -144,6 +145,8 @@ def make_func_sig(config, func):
     if func.end_ea - func.start_ea < config.min_func_length:
         logger.debug("Function is too short")
         raise FuncTooShortException()
+
+    logger.info("%s - %s", get_name(func.start_ea), hex(func.start_ea))
 
     ea = func.start_ea
     publics = []  # type: idc.ea_t
@@ -264,7 +267,20 @@ def make_func_sig(config, func):
 def make_func_sigs(config):
     logger = logging.getLogger("idb2pat:make_func_sigs")
     sigs = []
-    if config.mode == ConfigMode.USER_SELECT_FUNCTION:
+    if config.mode == ConfigMode.USER_CREATED_NAME:
+        for f in get_functions():
+            if not has_user_name(get_flags(f.start_ea)):
+                continue
+            try:
+                sigs.append(make_func_sig(config, f))
+            except FuncTooShortException:
+                pass
+            except Exception as e:
+                logger.exception(e)
+                logger.error("Failed to create signature for function at %s (%s)",
+                    hex(f.start_ea), get_name(f.start_ea) or "")
+
+    elif config.mode == ConfigMode.USER_SELECT_FUNCTION:
         f = choose_func("Choose Function:", BADADDR)
         if f is None:
             logger.error("No function selected")
@@ -335,7 +351,6 @@ def make_func_sigs(config):
         n = get_func_qty()
         for i, f in enumerate(get_functions()):
             try:
-                logger.info("[ %d / %d ] %s %s", i + 1, n, get_name(f.start_ea), hex(f.start_ea))
                 sigs.append(make_func_sig(config, f))
             except FuncTooShortException:
                 pass
